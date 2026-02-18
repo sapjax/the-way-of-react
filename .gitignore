@@ -1,0 +1,7 @@
+.vscode/
+*.epub
+*.pdf
+*.html
+
+demo/
+review.md

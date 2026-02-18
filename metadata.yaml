@@ -1,0 +1,13 @@
+---
+title: "The Way of React"
+subtitle: "Reinventing React From Scratch"
+author: "sapjax"
+language: "en-US"
+publisher: "Self-Published"
+rights: "© 2026 sapjax. All rights reserved."
+description: |
+  A hands-on journey through the evolution of React. 
+  Instead of memorizing APIs, you'll reinvent React from scratch — 
+  from raw DOM manipulation to Hooks, Virtual DOM, and Concurrent Mode.
+cover-image: "cover.jpg"
+---

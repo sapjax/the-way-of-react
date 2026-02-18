@@ -1,0 +1,229 @@
+/* ==========================================================================
+   The Way of React — EPUB Stylesheet (KDP-optimized)
+   
+   KDP Rules:
+   - All sizes in relative units (em / %)
+   - No fixed width/height on text containers
+   - Left/right body margins at 0 (reader controls them)
+   - Reflowable content only
+   ========================================================================== */
+
+/* --- Base Typography --- */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Georgia, "Bookerly", "Palatino Linotype", serif;
+  font-size: 1em;
+  line-height: 1.6;
+  text-align: justify;
+  orphans: 2;
+  widows: 2;
+}
+
+p {
+  margin: 0;
+  margin-bottom: 0.6em;
+  padding: 0;
+/* text-indent: 1.2em; */
+  line-height: 1.8;
+}
+
+/* First paragraph after heading: no indent (book convention) */
+h1 + p, h2 + p, h3 + p, h4 + p,
+blockquote + p, pre + p, ul + p, ol + p, table + p {
+  text-indent: 0;
+}
+
+/* --- Headings --- */
+h1 {
+  font-size: 1.8em;
+  line-height: 1.2;
+  text-align: left;
+  margin-top: 2em;
+  margin-bottom: 0.8em;
+  page-break-before: always;
+}
+
+h2 {
+  font-size: 1.4em;
+  line-height: 1.3;
+  text-align: left;
+  margin-top: 1.8em;
+  margin-bottom: 0.6em;
+}
+
+h3 {
+  font-size: 1.2em;
+  line-height: 1.3;
+  text-align: left;
+  margin-top: 1.4em;
+  margin-bottom: 0.4em;
+}
+
+h4, h5, h6 {
+  font-size: 1.05em;
+  line-height: 1.3;
+  text-align: left;
+  margin-top: 1.2em;
+  margin-bottom: 0.3em;
+}
+
+/* --- Code (critical for a programming book) --- */
+code {
+  font-family: "Courier New", "Courier", "SFMono-Regular", monospace;
+  font-size: 0.85em;
+}
+
+/* Inline code */
+p code, li code, td code {
+  background-color: #f0f0f0;
+  padding: 0.1em 0.3em;
+  border-radius: 0.2em;
+}
+
+/* Code blocks */
+pre {
+  margin: 1em 0;
+  padding: 0.8em 1em;
+  background-color: #f5f5f5;
+  border-left: 0.2em solid #ccc;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  page-break-inside: avoid;
+  line-height: 1.45;
+}
+
+pre code {
+  font-size: 0.8em;
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* --- Blockquotes (Student/Master dialogue emphasis, chapter goals) --- */
+blockquote {
+  margin: 1em 0;
+  margin-left: 0;
+  padding: 0.6em 1em;
+  border-left: 0.2em solid #666;
+  font-style: italic;
+  color: #333;
+}
+
+blockquote p {
+  text-indent: 0;
+  margin-bottom: 0.5em;
+}
+
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Bold dialogue markers (Master/Student) --- */
+strong {
+  font-weight: bold;
+}
+
+/* --- Lists --- */
+ul, ol {
+  margin: 0.8em 0;
+  padding-left: 2em;
+}
+
+li {
+  margin-bottom: 0.3em;
+  text-indent: 0;
+}
+
+li p {
+  text-indent: 0;
+}
+
+/* --- Tables (comparison tables throughout the book) --- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.9em;
+  page-break-inside: avoid;
+}
+
+th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+  text-align: left;
+  padding: 0.5em 0.6em;
+  border-bottom: 0.15em solid #999;
+}
+
+td {
+  padding: 0.4em 0.6em;
+  border-bottom: 0.05em solid #ddd;
+  vertical-align: top;
+  text-align: left;
+}
+
+/* --- Horizontal Rules (chapter section dividers) --- */
+hr {
+  border: none;
+  border-top: 0.05em solid #ccc;
+  margin: 2em 0;
+}
+
+/* --- Links --- */
+a {
+  color: #1a5276;
+  text-decoration: underline;
+}
+
+/* --- Images --- */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+figure {
+  margin: 1em 0;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+figcaption {
+  font-size: 0.9em;
+  font-style: italic;
+  color: #555;
+  margin-top: 0.4em;
+}
+
+/* --- Table of Contents --- */
+nav#toc ol {
+  padding: 0;
+  margin-left: 1em;
+}
+
+nav#toc li {
+  list-style-type: none;
+  margin: 0.3em 0;
+}
+
+/* --- Footnotes --- */
+a.footnote-ref {
+  vertical-align: super;
+  font-size: 0.75em;
+}
+
+/* --- ASCII diagrams (used throughout the book) --- */
+pre:not([class]) {
+  font-size: 0.78em;
+  border-left-color: #999;
+}
+
+/* --- Pandoc syntax highlighting overrides (softer colors for e-ink) --- */
+code span.kw { color: #2c3e50; font-weight: bold; } /* Keyword */
+code span.dt { color: #7b3f00; }                     /* DataType */
+code span.st { color: #6a3d9a; }                     /* String */
+code span.co { color: #777; font-style: italic; }    /* Comment */
+code span.fu { color: #1a5276; }                     /* Function */
+code span.op { color: #333; }                        /* Operator */
+code span.dv { color: #b45309; }                     /* DecVal (numbers) */
