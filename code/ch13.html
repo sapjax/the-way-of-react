@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 13 — The Power of All Hooks</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    h1 { color: #0066cc; }
+    button { padding: 8px 16px; font-size: 14px; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+    input { padding: 8px; font-size: 14px; width: 80%; margin-bottom: 10px; }
+    .card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 20px; max-width: 400px; }
+    .log-box { font-family: monospace; background: #282c34; color: #abb2bf; padding: 10px; height: 150px; overflow-y: auto; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    // === Minimal Fiber engine (full Hooks support) ===
+    function h(type, props, ...children) {
+      return {
+        type,
+        props: {
+          ...props,
+          children: children.flat().map(child =>
+            typeof child === "object" ? child : { type: "TEXT_ELEMENT", props: { nodeValue: child, children: [] } }
+          )
+        }
+      };
+    }
+
+    let workInProgress = null, currentRoot = null, wipRoot = null, deletions = null;
+    let wipFiber = null, hookIndex = null;
+
+    function render(element, container) {
+      wipRoot = { dom: container, props: { children: [element] }, alternate: currentRoot };
+      deletions = [];
+      workInProgress = wipRoot;
+    }
+
+    function workLoop(deadline) {
+      let shouldYield = false;
+      while (workInProgress && !shouldYield) {
+        workInProgress = performUnitOfWork(workInProgress);
+        shouldYield = deadline.timeRemaining() < 1;
+      }
+      if (!workInProgress && wipRoot) commitRoot();
+      requestIdleCallback(workLoop);
+    }
+    requestIdleCallback(workLoop);
+
+    function performUnitOfWork(fiber) {
+      const isFunctionComponent = fiber.type instanceof Function;
+      if (isFunctionComponent) {
+        wipFiber = fiber;
+        hookIndex = 0;
+        wipFiber.hooks = [];
+        const children = [fiber.type(fiber.props)].flat();
+        reconcileChildren(fiber, children);
+      } else {
+        if (!fiber.dom) fiber.dom = createDom(fiber);
+        reconcileChildren(fiber, fiber.props.children);
+      }
+
+      if (fiber.child) return fiber.child;
+      let nextFiber = fiber;
+      while (nextFiber) {
+        if (nextFiber.sibling) return nextFiber.sibling;
+        nextFiber = nextFiber.return;
+      }
+      return null;
+    }
+
+    function createDom(fiber) {
+      const dom = fiber.type === "TEXT_ELEMENT" ? document.createTextNode("") : document.createElement(fiber.type);
+      updateDom(dom, {}, fiber.props);
+      return dom;
+    }
+
+    function updateDom(dom, prevProps, nextProps) {
+      for (const k in prevProps) {
+        if (k !== 'children') {
+          if (!(k in nextProps) || prevProps[k] !== nextProps[k]) {
+            if (k.startsWith('on')) dom.removeEventListener(k.slice(2).toLowerCase(), prevProps[k]);
+            else if (!(k in nextProps)) {
+              if (k === 'className') dom.removeAttribute('class');
+              else if (k === 'style') dom.style.cssText = '';
+              else dom[k] = '';
+            }
+          }
+        }
+      }
+      for (const k in nextProps) {
+        if (k !== 'children' && prevProps[k] !== nextProps[k]) {
+          if (k.startsWith('on')) dom.addEventListener(k.slice(2).toLowerCase(), nextProps[k]);
+          else {
+            if (k === 'className') dom.setAttribute('class', nextProps[k]);
+            else if (k === 'style' && typeof nextProps[k] === 'string') dom.style.cssText = nextProps[k];
+            else dom[k] = nextProps[k];
+          }
+        }
+      }
+    }
+
+    function reconcileChildren(wipFiber, elements) {
+      let index = 0, oldFiber = wipFiber.alternate && wipFiber.alternate.child, prevSibling = null;
+      while (index < elements.length || oldFiber != null) {
+        const element = elements[index];
+        let newFiber = null;
+        const sameType = oldFiber && element && element.type === oldFiber.type;
+
+        if (sameType) newFiber = { type: oldFiber.type, props: element.props, dom: oldFiber.dom, return: wipFiber, alternate: oldFiber, effectTag: "UPDATE" };
+        if (element && !sameType) newFiber = { type: element.type, props: element.props, dom: null, return: wipFiber, alternate: null, effectTag: "PLACEMENT" };
+        if (oldFiber && !sameType) { oldFiber.effectTag = "DELETION"; deletions.push(oldFiber); }
+
+        if (oldFiber) oldFiber = oldFiber.sibling;
+        if (index === 0) wipFiber.child = newFiber;
+        else if (element) prevSibling.sibling = newFiber;
+        prevSibling = newFiber;
+        index++;
+      }
+    }
+
+    function commitRoot() {
+      deletions.forEach(commitWork);
+      commitWork(wipRoot.child);
+      commitEffects(wipRoot.child); // trigger side effects after DOM work
+      currentRoot = wipRoot;
+      wipRoot = null;
+    }
+
+    function commitWork(fiber) {
+      if (!fiber) return;
+      let domParentFiber = fiber.return;
+      while (!domParentFiber.dom) domParentFiber = domParentFiber.return;
+      const domParent = domParentFiber.dom;
+
+      if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) domParent.appendChild(fiber.dom);
+      else if (fiber.effectTag === "UPDATE" && fiber.dom != null) updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+      else if (fiber.effectTag === "DELETION") {
+        commitDeletion(fiber, domParent);
+        return;
+      }
+
+      commitWork(fiber.child);
+      commitWork(fiber.sibling);
+    }
+    
+    function commitDeletion(fiber, domParent) {
+      if (fiber.dom) domParent.removeChild(fiber.dom);
+      else commitDeletion(fiber.child, domParent);
+    }
+
+    function commitEffects(fiber) {
+      if (!fiber) return;
+      if (fiber.hooks) {
+        fiber.hooks.forEach(hook => {
+          if (hook.tag === 'effect' && hook.hasChanged) {
+            if (hook.cleanup) hook.cleanup();
+            if (hook.callback) hook.cleanup = hook.callback();
+          }
+        });
+      }
+      commitEffects(fiber.child);
+      commitEffects(fiber.sibling);
+    }
+
+    // === Hooks API ===
+    function getOldHook() {
+      return wipFiber.alternate && wipFiber.alternate.hooks && wipFiber.alternate.hooks[hookIndex];
+    }
+
+    function useState(initial) {
+      const oldHook = getOldHook();
+      const hook = { 
+        state: oldHook ? oldHook.state : initial, 
+        queue: oldHook ? oldHook.queue : [],
+        setState: oldHook ? oldHook.setState : null
+      };
+      
+      hook.queue.forEach(action => hook.state = typeof action === 'function' ? action(hook.state) : action);
+      hook.queue.length = 0;
+
+      if (!hook.setState) {
+        hook.setState = action => {
+          hook.queue.push(action);
+          wipRoot = { dom: currentRoot.dom, props: currentRoot.props, alternate: currentRoot };
+          workInProgress = wipRoot;
+          deletions = [];
+        };
+      }
+      wipFiber.hooks.push(hook);
+      hookIndex++;
+      return [hook.state, hook.setState];
+    }
+
+    function useEffect(callback, deps) {
+      const oldHook = getOldHook();
+      let hasChanged = true;
+      if (oldHook && deps) {
+        hasChanged = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
+      }
+      const hook = { tag: 'effect', callback, deps, hasChanged, cleanup: oldHook ? oldHook.cleanup : undefined };
+      wipFiber.hooks.push(hook);
+      hookIndex++;
+    }
+
+    function useRef(initial) {
+      const [ref] = useState({ current: initial });
+      return ref;
+    }
+
+    function useMemo(factory, deps) {
+      const oldHook = getOldHook();
+      let hasChanged = true;
+      if (oldHook && deps) {
+        hasChanged = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
+      }
+      const hook = { value: hasChanged ? factory() : oldHook.value, deps };
+      wipFiber.hooks.push(hook);
+      hookIndex++;
+      return hook.value;
+    }
+
+    function useCallback(callback, deps) {
+      return useMemo(() => callback, deps);
+    }
+
+    // === Demo app: observe useEffect and useMemo behavior ===
+    function App() {
+      const [count, setCount] = useState(0);
+      const [text, setText] = useState('');
+      const renderCount = useRef(0);
+      
+      renderCount.current++;
+
+      // useEffect: depends on count, doesn't re-run if only text changes
+      useEffect(() => {
+        console.log("🌊 Effect: component mounted or count changed ->", count);
+        return () => console.log("🧹 Cleanup: count is about to change ->", count);
+      }, [count]);
+
+      // useMemo: depends on count, text input won't trigger recomputation
+      const expensiveValue = useMemo(() => {
+        console.log("🧮 Running expensive calculation...");
+        return "✨ Expensive result: " + count * 100;
+      }, [count]);
+
+      return h('div', { className: 'card' },
+        h('h2', null, 'All Hooks Demo'),
+        h('p', null, `Total render count: ${renderCount.current}`),
+        h('p', null, `Count value: ${count}`),
+        h('p', { style: 'color: green;' }, expensiveValue),
+        h('button', { onclick: () => setCount(c => c + 1) }, 'Increment count'),
+        h('hr', null),
+        h('input', { 
+          placeholder: 'Type to test (won\'t affect count or expensive calculation)',
+          value: text, 
+          oninput: (e) => setText(e.target.value) 
+        }),
+        h('p', null, `You typed: ${text}`),
+        h('p', { style: 'font-size: 12px; color: gray;' }, 'Open F12 Console to see when useEffect and useMemo fire')
+      );
+    }
+
+    render(h(App, null), document.getElementById('app'));
+  </script>
+</body>
+</html>

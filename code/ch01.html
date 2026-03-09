@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 1 — Raw DOM Todo List</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f9f9f9; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; background: white; }
+    .card h3 { margin-top: 0; }
+    button { padding: 6px 12px; cursor: pointer; margin: 4px; border-radius: 4px; border: 1px solid #ccc; background: #eee; }
+    li { padding: 8px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    li .task-content { display: flex; align-items: center; gap: 8px; }
+    li.done span { text-decoration: line-through; color: #999; }
+    li .delete-btn { background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    input[type="text"] { padding: 8px; width: 60%; border-radius: 4px; border: 1px solid #ccc; }
+    #empty-msg { color: #999; font-style: italic; font-size: 14px; }
+    #stats { font-size: 14px; color: #666; margin-top: 10px; }
+    .perf-btn { background: #ff4444; color: white; border: none; padding: 8px 16px; cursor: pointer; border-radius: 4px; }
+    .perf-btn:hover { background: #cc0000; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3>My Todo List</h3>
+    <div>
+      <input type="text" id="todo-input" placeholder="Add a task">
+      <button id="add-btn">Add</button>
+    </div>
+    <p id="stats">Done 0 / Total 0</p>
+    <p id="empty-msg">No data</p>
+    <ul id="todo-list" style="padding-left: 0; margin-bottom: 0;"></ul>
+  </div>
+
+  <div class="card">
+    <p style="margin-top: 0;"><strong>Performance experiment:</strong> Click the button below to insert 5000 tasks at once.<br>Watch the browser freeze.</p>
+    <button class="perf-btn" id="perf-btn">⚡ Insert 5000 tasks</button>
+  </div>
+
+  <script>
+    const input = document.getElementById('todo-input');
+    const addBtn = document.getElementById('add-btn');
+    const list = document.getElementById('todo-list');
+    const emptyMsg = document.getElementById('empty-msg');
+    const statsEl = document.getElementById('stats');
+
+    // === Pain point 1: Must manually sync multiple UI parts on every state change ===
+    function checkEmpty() {
+      emptyMsg.style.display = list.children.length === 0 ? 'block' : 'none';
+    }
+
+    function updateStats() {
+      const allItems = list.querySelectorAll('li');
+      const doneItems = list.querySelectorAll('li.done');
+      statsEl.textContent = `Done ${doneItems.length} / Total ${allItems.length}`;
+    }
+
+    function addTodoItem(text) {
+      const li = document.createElement('li');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.addEventListener('change', function() {
+        if (checkbox.checked) {
+          li.classList.add('done');
+        } else {
+          li.classList.remove('done');
+        }
+        updateStats(); // Don't forget to update stats!
+      });
+
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'task-content';
+
+      const span = document.createElement('span');
+      span.textContent = text;
+
+      contentDiv.appendChild(checkbox);
+      contentDiv.appendChild(span);
+      li.appendChild(contentDiv);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.addEventListener('click', function() {
+        list.removeChild(li);
+        checkEmpty();    // Don't forget to update empty state!
+        updateStats();   // Don't forget to update stats!
+      });
+      li.appendChild(deleteBtn);
+
+      list.appendChild(li);
+      // ⚠️ Force synchronous reflow (see note above)
+      li.offsetHeight;
+      checkEmpty();      // Don't forget to update empty state!
+      updateStats();     // Don't forget to update stats!
+    }
+
+    addBtn.addEventListener('click', function() {
+      const value = input.value.trim();
+      if (!value) return;
+      addTodoItem(value);
+      input.value = '';
+    });
+
+    // === Pain point 2: Performance experiment — freeze from many DOM operations ===
+    document.getElementById('perf-btn').addEventListener('click', function() {
+      const start = performance.now();
+      for (let i = 0; i < 5000; i++) {
+        addTodoItem('Task #' + (i + 1));
+      }
+      const elapsed = (performance.now() - start).toFixed(0);
+      alert(`Inserting 5000 DOM nodes took: ${elapsed}ms\n\n(During this time, the browser cannot respond to any input)`);
+    });
+
+    checkEmpty();
+    updateStats();
+  </script>
+</body>
+</html>

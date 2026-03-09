@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 7 — Class Components & Lifecycle</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; }
+    button { padding: 6px 12px; cursor: pointer; margin: 4px; }
+    .timer { font-size: 48px; font-weight: bold; color: #333; }
+    .info { color: #666; font-size: 13px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    // === Mini-React Engine (cumulative) ===
+
+    function h(tag, props, children) {
+      return { tag, props: props || {}, children: children || [] };
+    }
+
+    class Component {
+      constructor(props) {
+        this.props = props || {};
+        this.state = {};
+      }
+      setState(newState) {
+        this.state = Object.assign({}, this.state, newState);
+        this._update();
+      }
+      _update() {
+        if (!this._vnode) return;
+        const oldVNode = this._vnode;
+        const newVNode = this.render();
+        patch(oldVNode, newVNode);
+        this._vnode = newVNode;
+      }
+      render() { throw new Error('Must implement render()'); }
+    }
+
+    function mount(vnode, container) {
+      if (typeof vnode === 'string' || typeof vnode === 'number') {
+        container.appendChild(document.createTextNode(vnode));
+        return;
+      }
+      if (typeof vnode.tag === 'function') {
+        const instance = new vnode.tag(vnode.props);
+        vnode._instance = instance;
+        const subTree = instance.render();
+        instance._vnode = subTree;
+        mount(subTree, container);
+        vnode.el = subTree.el;
+        if (instance.componentDidMount) instance.componentDidMount();
+        return;
+      }
+      const el = (vnode.el = document.createElement(vnode.tag));
+      for (const key in vnode.props) {
+        if (key.startsWith('on')) {
+          el.addEventListener(key.slice(2).toLowerCase(), vnode.props[key]);
+        } else {
+          if (key === 'className') el.setAttribute('class', vnode.props[key]);
+          else if (key === 'style' && typeof vnode.props[key] === 'string') el.style.cssText = vnode.props[key];
+          else el.setAttribute(key, vnode.props[key]);
+        }
+      }
+      if (typeof vnode.children === 'string') {
+        el.textContent = vnode.children;
+      } else {
+        (vnode.children || []).forEach(child => {
+          if (typeof child === 'string' || typeof child === 'number')
+            el.appendChild(document.createTextNode(child));
+          else mount(child, el);
+        });
+      }
+      container.appendChild(el);
+    }
+
+    function patch(oldVNode, newVNode) {
+      if (typeof newVNode.tag === 'function') {
+        if (oldVNode.tag === newVNode.tag) {
+          const instance = (newVNode._instance = oldVNode._instance);
+          const nextProps = newVNode.props;
+          const nextState = instance.state;
+          if (instance.shouldComponentUpdate &&
+              !instance.shouldComponentUpdate(nextProps, nextState)) {
+            instance.props = nextProps;
+            newVNode.el = oldVNode.el;
+            newVNode._instance = instance;
+            return;
+          }
+          instance.props = nextProps;
+          const oldSub = instance._vnode;
+          const newSub = instance.render();
+          instance._vnode = newSub;
+          patch(oldSub, newSub);
+          newVNode.el = newSub.el;
+        } else {
+          const parent = oldVNode.el.parentNode;
+          mount(newVNode, parent);
+          parent.replaceChild(newVNode.el, oldVNode.el);
+        }
+        return;
+      }
+      if (oldVNode.tag !== newVNode.tag) {
+        const parent = oldVNode.el.parentNode;
+        const tmp = document.createElement('div');
+        mount(newVNode, tmp);
+        parent.replaceChild(newVNode.el, oldVNode.el);
+        return;
+      }
+      const el = (newVNode.el = oldVNode.el);
+      const oldP = oldVNode.props || {}, newP = newVNode.props || {};
+      for (const key in newP) {
+        if (oldP[key] !== newP[key]) {
+          if (key.startsWith('on')) {
+            const evt = key.slice(2).toLowerCase();
+            if (oldP[key]) el.removeEventListener(evt, oldP[key]);
+            el.addEventListener(evt, newP[key]);
+          } else {
+            if (key === 'className') el.setAttribute('class', newP[key]);
+            else if (key === 'style' && typeof newP[key] === 'string') el.style.cssText = newP[key];
+            else el.setAttribute(key, newP[key]);
+          }
+        }
+      }
+      for (const key in oldP) {
+        if (!(key in newP)) {
+          if (key.startsWith('on')) el.removeEventListener(key.slice(2).toLowerCase(), oldP[key]);
+          else if (key === 'className') el.removeAttribute('class');
+          else if (key === 'style') el.style.cssText = '';
+          else el.removeAttribute(key)
+        }
+      }
+      const oldChildren = oldVNode.children || [];
+      const newChildren = newVNode.children || [];
+      if (typeof newChildren === 'string') {
+        if (oldChildren !== newChildren) el.textContent = newChildren;
+      } else if (typeof oldChildren === 'string') {
+        el.textContent = '';
+        newChildren.forEach(c => mount(c, el));
+      } else {
+        const commonLength = Math.min(oldChildren.length, newChildren.length);
+        for (let i = 0; i < commonLength; i++) {
+          const oldChild = oldChildren[i], newChild = newChildren[i];
+          if (typeof oldChild === 'string' && typeof newChild === 'string') {
+            if (oldChild !== newChild) el.childNodes[i].textContent = newChild;
+          } else if (typeof oldChild === 'object' && typeof newChild === 'object') {
+            patch(oldChild, newChild);
+          } else {
+            if (typeof newChild === 'string' || typeof newChild === 'number') {
+              el.replaceChild(document.createTextNode(newChild), el.childNodes[i]);
+            } else {
+              const tmp = document.createElement('div');
+              mount(newChild, tmp);
+              el.replaceChild(newChild.el, el.childNodes[i]);
+            }
+          }
+        }
+        if (newChildren.length > oldChildren.length) newChildren.slice(oldChildren.length).forEach(c => mount(c, el));
+        if (newChildren.length < oldChildren.length) {
+          for (let i = oldChildren.length - 1; i >= commonLength; i--) el.removeChild(el.childNodes[i]);
+        }
+      }
+    }
+
+    // === Timer Component with Lifecycle ===
+
+    class Timer extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { seconds: 0 };
+      }
+
+      componentDidMount() {
+        // ✅ Using arrow function to solve this binding!
+        this.timerId = setInterval(() => {
+          this.setState({ seconds: this.state.seconds + 1 });
+        }, 1000);
+      }
+
+      // ⚠️ In our simplified engine this method won't be automatically called, shown here for best practice
+      componentWillUnmount() {
+        clearInterval(this.timerId);
+      }
+
+      render() {
+        const color = this.state.seconds % 2 === 0 ? '#333' : '#0066cc';
+        return h('div', { className: 'card' }, [
+          h('div', { className: 'timer', style: 'color:' + color }, [
+            String(this.state.seconds) + 's'
+          ]),
+          h('p', { className: 'info' }, [
+            'This timer uses setState + patch. Only the number updates, not the whole page.'
+          ]),
+          h('p', { className: 'info' }, [
+            'componentDidMount → starts setInterval | componentWillUnmount → clears it'
+          ])
+        ]);
+      }
+
+    }
+
+    // === shouldComponentUpdate Demo ===
+
+    // Parent: re-renders every second to simulate prop changes
+    class Parent extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { tick: 0, important: 0 };
+      }
+      componentDidMount() {
+        this._id = setInterval(() => {
+          this.setState({ tick: this.state.tick + 1 });
+        }, 1000);
+      }
+      componentWillUnmount() { clearInterval(this._id); }
+      render() {
+        return h('div', { className: 'card' }, [
+          h('p', { className: 'info' }, [
+            'Parent tick: ' + this.state.tick + ' (re-renders every second)'
+          ]),
+          h('button', { onclick: () => this.setState({ important: this.state.important + 1 }) }, [
+            'Change important prop (' + this.state.important + ')'
+          ]),
+          h(Child, { important: this.state.important, tick: this.state.tick })
+        ]);
+      }
+    }
+
+    // Child: only re-renders when "important" prop changes, ignores "tick"
+    class Child extends Component {
+      constructor(props) {
+        super(props);
+        this._renderCount = 0;
+      }
+      shouldComponentUpdate(nextProps, nextState) {
+        // Skip re-render if only "tick" changed
+        return nextProps.important !== this.props.important;
+      }
+      render() {
+        this._renderCount++;
+        return h('div', { style: 'margin-top:8px; padding:8px; background:#f0f8ff; border-radius:4px;' }, [
+          h('p', { className: 'info' }, [
+            '✅ Child render count: ' + this._renderCount +
+            ' (shouldComponentUpdate blocks tick-only updates)'
+          ]),
+          h('p', null, ['important = ' + this.props.important])
+        ]);
+      }
+    }
+
+    // === Mount the App ===
+
+    const appVNode = h('div', null, [
+      h('h1', null, ['Class Components & Lifecycle']),
+      h(Timer, null),
+      h('h2', null, ['shouldComponentUpdate Demo']),
+      h(Parent, null)
+    ]);
+
+    mount(appVNode, document.getElementById('app'));
+  </script>
+</body>
+</html>

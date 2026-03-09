@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 11 — The Complete Fiber Engine</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    h1 { color: #0066cc; }
+    button { padding: 8px 16px; font-size: 14px; cursor: pointer; }
+    #log { margin-top: 20px; font-family: monospace; background: #fdfdfd; border: 1px solid #ddd; padding: 10px; height: 150px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="log"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    function log(msg) {
+      const p = document.createElement('div');
+      p.textContent = msg;
+      logEl.prepend(p);
+    }
+
+    // === 1. Standardize node format, auto-wrap text as TEXT_ELEMENT ===
+    function h(type, props, ...children) {
+      return {
+        type,
+        props: {
+          ...props,
+          children: children.flat().map(child =>
+            typeof child === "object"
+              ? child
+              : { type: "TEXT_ELEMENT", props: { nodeValue: child, children: [] } }
+          )
+        }
+      };
+    }
+
+    // === 2. Initialize Engine State ===
+    let currentRoot = null;
+    let wipRoot = null;
+    let workInProgress = null;
+    let deletions = [];
+
+    function render(element, container) {
+      wipRoot = {
+        dom: container,
+        props: { children: [element] },
+        alternate: currentRoot  // Connect to finished blueprint
+      };
+      deletions = [];
+      workInProgress = wipRoot;
+      log('🚀 render() triggered, starting Render Phase...');
+    }
+
+    // === 3. Time Slicing and Engine Heartbeat ===
+    function workLoop(deadline) {
+      let shouldYield = false;
+      while (workInProgress && !shouldYield) {
+        workInProgress = performUnitOfWork(workInProgress);
+        shouldYield = deadline.timeRemaining() < 1;
+      }
+      
+      // Render Phase finished, enter Commit Phase
+      if (!workInProgress && wipRoot) {
+        log('✅ Render Phase complete! Entering Commit Phase...');
+        commitRoot();
+      }
+      requestIdleCallback(workLoop);
+    }
+    requestIdleCallback(workLoop);
+
+    // Keep browser active for stable idle callbacks
+    function keepAwake() { requestAnimationFrame(keepAwake); }
+    requestAnimationFrame(keepAwake);
+
+    // === 4. Black Box 1: Render Phase (Reconciliation & Drafting) ===
+    function performUnitOfWork(fiber) {
+      if (!fiber.dom) {
+        fiber.dom = createDom(fiber);
+      }
+      reconcileChildren(fiber, fiber.props.children);
+
+      // Return next node (Down -> Right -> Up)
+      if (fiber.child) return fiber.child;
+      let nextFiber = fiber;
+      while (nextFiber) {
+        if (nextFiber.sibling) return nextFiber.sibling;
+        nextFiber = nextFiber.return;
+      }
+      return null;
+    }
+
+    function reconcileChildren(wipFiber, elements) {
+      let index = 0;
+      let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
+      let prevSibling = null;
+
+      while (index < elements.length || oldFiber != null) {
+        const element = elements[index];
+        let newFiber = null;
+        const sameType = oldFiber && element && element.type === oldFiber.type;
+
+        if (sameType) {
+          // Reuse old DOM
+          newFiber = {
+            type: oldFiber.type, props: element.props, dom: oldFiber.dom,
+            return: wipFiber, alternate: oldFiber, effectTag: "UPDATE"
+          };
+        }
+        if (element && !sameType) {
+          // Create new DOM
+          newFiber = {
+            type: element.type, props: element.props, dom: null,
+            return: wipFiber, alternate: null, effectTag: "PLACEMENT"
+          };
+        }
+        if (oldFiber && !sameType) {
+          // Mark for deletion
+          oldFiber.effectTag = "DELETION";
+          deletions.push(oldFiber);
+        }
+
+        if (oldFiber) oldFiber = oldFiber.sibling;
+        if (index === 0) wipFiber.child = newFiber;
+        else if (element) prevSibling.sibling = newFiber;
+
+        prevSibling = newFiber;
+        index++;
+      }
+    }
+
+    // === 5. Black Box 2: Commit Phase (Unified Update) ===
+    function commitRoot() {
+      deletions.forEach(commitWork); 
+      commitWork(wipRoot.child);     
+      currentRoot = wipRoot;         
+      wipRoot = null;
+      log('🎉 Commit Phase complete! Page updated.');
+    }
+
+    function commitWork(fiber) {
+      if (!fiber) return;
+      
+      let domParentFiber = fiber.return;
+      while (!domParentFiber.dom) domParentFiber = domParentFiber.return;
+      const domParent = domParentFiber.dom;
+
+      if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
+        domParent.appendChild(fiber.dom);
+      } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
+        updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+      } else if (fiber.effectTag === "DELETION") {
+        commitDeletion(fiber, domParent);
+        return; 
+      }
+
+      commitWork(fiber.child);
+      commitWork(fiber.sibling);
+    }
+
+    function commitDeletion(fiber, domParent) {
+      if (fiber.dom) domParent.removeChild(fiber.dom);
+      else commitDeletion(fiber.child, domParent); 
+    }
+
+    // === 6. Low-level DOM Ops ===
+    function createDom(fiber) {
+      const dom = fiber.type === "TEXT_ELEMENT"
+        ? document.createTextNode("")
+        : document.createElement(fiber.type);
+
+      updateDom(dom, {}, fiber.props);
+
+      return dom;
+    }
+
+    function updateDom(dom, prevProps, nextProps) {
+      // Pass 1: Remove old props and event listeners
+      for (const key in prevProps) {
+        if (key === "children") continue;
+        if (!(key in nextProps) || prevProps[key] !== nextProps[key]) {
+          if (key.startsWith("on")) {
+            // Event listener: remove old
+            dom.removeEventListener(key.slice(2).toLowerCase(), prevProps[key]);
+          } else if (!(key in nextProps)) {
+            // Prop: old exists, new doesn't, clear it
+            dom[key] = "";
+          }
+        }
+      }
+      // Pass 2: Add or update new props and event listeners
+      for (const key in nextProps) {
+        if (key === "children") continue;
+        if (prevProps[key] !== nextProps[key]) {
+          if (key.startsWith("on")) {
+            dom.addEventListener(key.slice(2).toLowerCase(), nextProps[key]);
+          } else {
+            dom[key] = nextProps[key];
+          }
+        }
+      }
+    }
+
+    // === Application Demo ===
+    // Since Hooks aren't implemented yet, use global variable to simulate state
+    let counter = 1;
+    function getAppVNode() {
+      return h('div', { id: 'container' },
+        h('h1', null, 'Fiber Engine Running'),
+        h('p', null, `Current render count: ${counter}`),
+        h('button', { onclick: () => { counter++; renderApp(); } }, 'Trigger Fiber Update')
+      );
+    }
+
+    function renderApp() {
+      render(getAppVNode(), document.getElementById('app'));
+    }
+
+    // Initial mount
+    renderApp();
+  </script>
+</body>
+</html>

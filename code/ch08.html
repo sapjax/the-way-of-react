@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 8 — Patterns of Reuse</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px 0; }
+    .circle { width: 30px; height: 30px; border-radius: 50%; background: #0066cc; position: fixed; pointer-events: none; transform: translate(-50%, -50%); z-index: 100; }
+    h3 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    // === Mini-React Engine (cumulative) ===
+    function h(tag, props, children) {
+      return { tag, props: props || {}, children: children || [] };
+    }
+
+    class Component {
+      constructor(props) {
+        this.props = props || {};
+        this.state = {};
+      }
+      setState(newState) {
+        this.state = Object.assign({}, this.state, newState);
+        this._update();
+      }
+      _update() {
+        if (!this._vnode) return;
+        const o = this._vnode;
+        const n = this.render();
+        patch(o, n);
+        this._vnode = n;
+      }
+      render() { throw new Error('Must implement render()'); }
+    }
+
+    function mount(vnode, container) {
+      if (typeof vnode === 'string' || typeof vnode === 'number') {
+        container.appendChild(document.createTextNode(vnode));
+        return;
+      }
+      if (typeof vnode.tag === 'function') {
+        const instance = new vnode.tag(vnode.props);
+        vnode._instance = instance;
+        const subTree = instance.render();
+        instance._vnode = subTree;
+        mount(subTree, container);
+        vnode.el = subTree.el;
+        if (instance.componentDidMount) instance.componentDidMount();
+        return;
+      }
+      const el = (vnode.el = document.createElement(vnode.tag));
+      for (const key in vnode.props) {
+        if (key.startsWith('on')) {
+          el.addEventListener(key.slice(2).toLowerCase(), vnode.props[key]);
+        } else {
+          if (key === 'className') el.setAttribute('class', vnode.props[key]);
+          else if (key === 'style' && typeof vnode.props[key] === 'string') el.style.cssText = vnode.props[key];
+          else el.setAttribute(key, vnode.props[key]);
+        }
+      }
+      if (typeof vnode.children === 'string') {
+        el.textContent = vnode.children;
+      } else {
+        (vnode.children || []).forEach(child => {
+          if (typeof child === 'string' || typeof child === 'number')
+            el.appendChild(document.createTextNode(child));
+          else mount(child, el);
+        });
+      }
+      container.appendChild(el);
+    }
+
+    function patch(oldVNode, newVNode) {
+      if (typeof newVNode.tag === 'function') {
+        if (oldVNode.tag === newVNode.tag) {
+          const instance = (newVNode._instance = oldVNode._instance);
+          const nextProps = newVNode.props;
+          const nextState = instance.state;
+          if (instance.shouldComponentUpdate &&
+              !instance.shouldComponentUpdate(nextProps, nextState)) {
+            instance.props = nextProps;
+            newVNode.el = oldVNode.el;
+            newVNode._instance = instance;
+            return;
+          }
+          instance.props = nextProps;
+          const oldSub = instance._vnode;
+          const newSub = instance.render();
+          instance._vnode = newSub;
+          patch(oldSub, newSub);
+          newVNode.el = newSub.el;
+        } else {
+          const parent = oldVNode.el.parentNode;
+          mount(newVNode, parent);
+          parent.replaceChild(newVNode.el, oldVNode.el);
+        }
+        return;
+      }
+      if (oldVNode.tag !== newVNode.tag) {
+        const parent = oldVNode.el.parentNode;
+        const tmp = document.createElement('div');
+        mount(newVNode, tmp);
+        parent.replaceChild(newVNode.el, oldVNode.el);
+        return;
+      }
+      const el = (newVNode.el = oldVNode.el);
+      const oldP = oldVNode.props || {}, newP = newVNode.props || {};
+      for (const key in newP) {
+        if (oldP[key] !== newP[key]) {
+          if (key.startsWith('on')) {
+            const evt = key.slice(2).toLowerCase();
+            if (oldP[key]) el.removeEventListener(evt, oldP[key]);
+            el.addEventListener(evt, newP[key]);
+          } else {
+            if (key === 'className') el.setAttribute('class', newP[key]);
+            else if (key === 'style' && typeof newP[key] === 'string') el.style.cssText = newP[key];
+            else el.setAttribute(key, newP[key]);
+          }
+        }
+      }
+      for (const key in oldP) {
+        if (!(key in newP)) {
+          if (key.startsWith('on')) el.removeEventListener(key.slice(2).toLowerCase(), oldP[key]);
+          else if (key === 'className') el.removeAttribute('class');
+          else if (key === 'style') el.style.cssText = '';
+          else el.removeAttribute(key)
+        }
+      }
+      const oldChildren = oldVNode.children || [];
+      const newChildren = newVNode.children || [];
+      if (typeof newChildren === 'string') {
+        if (oldChildren !== newChildren) el.textContent = newChildren;
+      } else if (typeof oldChildren === 'string') {
+        el.textContent = '';
+        newChildren.forEach(c => mount(c, el));
+      } else {
+        const commonLength = Math.min(oldChildren.length, newChildren.length);
+        for (let i = 0; i < commonLength; i++) {
+          const oldChild = oldChildren[i], newChild = newChildren[i];
+          if (typeof oldChild === 'string' && typeof newChild === 'string') {
+            if (oldChild !== newChild) el.childNodes[i].textContent = newChild;
+          } else if (typeof oldChild === 'object' && typeof newChild === 'object') {
+            patch(oldChild, newChild);
+          } else {
+            if (typeof newChild === 'string' || typeof newChild === 'number') {
+              el.replaceChild(document.createTextNode(newChild), el.childNodes[i]);
+            } else {
+              const tmp = document.createElement('div');
+              mount(newChild, tmp);
+              el.replaceChild(newChild.el, el.childNodes[i]);
+            }
+          }
+        }
+        if (newChildren.length > oldChildren.length) newChildren.slice(oldChildren.length).forEach(c => mount(c, el));
+        if (newChildren.length < oldChildren.length) {
+          for (let i = oldChildren.length - 1; i >= commonLength; i--) el.removeChild(el.childNodes[i]);
+        }
+      }
+    }
+
+    // === HOC Pattern: withMouse ===
+    function withMouse(WrappedComponent) {
+      return class WithMouse extends Component {
+        constructor(props) {
+          super(props);
+          this.state = { x: 0, y: 0 };
+          this._handler = (e) => this.setState({ x: e.clientX, y: e.clientY });
+        }
+        componentDidMount() {
+          window.addEventListener('mousemove', this._handler);
+        }
+        componentWillUnmount() {
+          window.removeEventListener('mousemove', this._handler);
+        }
+        render() {
+          return h(WrappedComponent, {
+            ...this.props,
+            mouse: { x: this.state.x, y: this.state.y }
+          }, []);
+        }
+      };
+    }
+
+    // Display component that uses mouse data via HOC
+    class RawDisplay extends Component {
+      render() {
+        const m = this.props.mouse || { x: 0, y: 0 };
+        return h('div', { className: 'card' }, [
+          h('h3', null, ['HOC Pattern: withMouse']),
+          h('p', null, ['Mouse position: ' + m.x + ', ' + m.y]),
+        ]);
+      }
+    }
+    const MouseDisplay = withMouse(RawDisplay);
+
+    // === Render Props Pattern: Mouse ===
+    class Mouse extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { x: 0, y: 0 };
+        this._handler = (e) => this.setState({ x: e.clientX, y: e.clientY });
+      }
+      componentDidMount() {
+        window.addEventListener('mousemove', this._handler);
+      }
+      componentWillUnmount() {
+        window.removeEventListener('mousemove', this._handler);
+      }
+      render() {
+        // Call the render prop function with current state
+        return this.props.render(this.state);
+      }
+    }
+
+    // === App ===
+    const appVNode = h('div', null, [
+      h('h1', null, ['Patterns of Reuse']),
+      h('p', null, ['Move your mouse to see both patterns in action.']),
+      
+      // HOC version
+      h(MouseDisplay, null),
+      
+      // Render Props version
+      h('div', { className: 'card' }, [
+        h('h3', null, ['Render Props Pattern: Mouse']),
+        h(Mouse, {
+          render: (mouse) => h('p', null, [
+            'Mouse position: ' + mouse.x + ', ' + mouse.y
+          ])
+        })
+      ]),
+    ]);
+
+    mount(appVNode, document.getElementById('app'));
+  </script>
+</body>
+</html>

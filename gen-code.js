@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const chaptersDir = path.join(process.cwd(), 'chapters', 'zh');
+const chaptersDir = path.join(process.cwd(), 'chapters', 'en');
 const codeDir = path.join(process.cwd(), 'code');
 
 // Ensure code directory exists
@@ -15,24 +15,30 @@ const files = fs.readdirSync(chaptersDir).filter(f => f.endsWith('.md'));
 
 let count = 0;
 for (const file of files) {
-  // Extract chapter number or prefix
-  const prefixMatch = file.match(/^(\d+)_/);
+  const isAppendix = file === 'appendix_a_mini_react.md';
+
+  // Extract output filename
   let outName;
-  if (prefixMatch) {
-     outName = `ch${prefixMatch[1]}.html`;
+  if (isAppendix) {
+    outName = 'mini-react.js';
   } else {
-     // Handle cases like appendix_a_mini_react.md
-     const nameMatch = file.match(/^([^_]+(?:_[^_]+)?)/); // gets appendix_a
-     const name = nameMatch ? nameMatch[1] : file.replace('.md', '');
-     outName = `${name}.html`;
+    const prefixMatch = file.match(/^(\d+)_/);
+    if (prefixMatch) {
+      outName = `ch${prefixMatch[1]}.html`;
+    } else {
+      const nameMatch = file.match(/^([^_]+(?:_[^_]+)?)/); // gets appendix_a
+      const name = nameMatch ? nameMatch[1] : file.replace('.md', '');
+      outName = `${name}.html`;
+    }
   }
   
   const filePath = path.join(chaptersDir, file);
-  
   const content = fs.readFileSync(filePath, 'utf-8');
-  
-  // Find all ```html blocks
-  const regex = /```html\n([\s\S]*?)\n```/g;
+
+  // Find code blocks: javascript for appendix, html for others
+  const lang = isAppendix ? 'javascript' : 'html';
+  const regex = new RegExp('```' + lang + '\\n([\\s\\S]*?)\\n```', 'g');
+
   let match;
   let lastMatchContent = null;
   
@@ -45,7 +51,7 @@ for (const file of files) {
     console.log(`√ Extracted ${outName} from ${file}`);
     count++;
   } else {
-    console.log(`- No HTML block found in ${file}`);
+    console.log(`- No ${lang.toUpperCase()} block found in ${file}`);
   }
 }
 

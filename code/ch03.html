@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 3 — Data Binding Todo List</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f9f9f9; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; background: white; }
+    .card h3 { margin-top: 0; }
+    button { padding: 6px 12px; cursor: pointer; margin: 4px; border-radius: 4px; border: 1px solid #ccc; background: #eee; }
+    button.active { background: #007bff; color: white; border-color: #007bff; }
+    li { padding: 8px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; list-style: none; }
+    li .task-content { display: flex; align-items: center; gap: 8px; }
+    li.done span { text-decoration: line-through; color: #999; }
+    li .delete-btn { background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    input[type="text"] { padding: 8px; width: 60%; border-radius: 4px; border: 1px solid #ccc; }
+    #stats { font-size: 14px; color: #666; margin-top: 10px; }
+    #empty-msg { color: #999; font-style: italic; font-size: 14px; margin-top: 10px; }
+    #log { background: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 150px; overflow-y: auto; }
+    .filters { margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3>My Todo List</h3>
+    <p style="font-size: 12px; color: #666;">This demo shows <strong>Observer Pattern</strong> data binding.<br>
+     Input focus will no longer be lost, and there's a simple Filter to demonstrate state sync.</p>
+    
+    <div>
+      <input type="text" id="todo-input" placeholder="Add a task">
+      <button id="add-btn">Add</button>
+    </div>
+    
+    <div class="filters" id="filters">
+      <button data-filter="all" class="filter-btn active">All</button>
+      <button data-filter="active" class="filter-btn">Active</button>
+      <button data-filter="completed" class="filter-btn">Completed</button>
+    </div>
+
+    <p id="stats">Total 0 items</p>
+    <p id="empty-msg">No data</p>
+    <ul id="todo-list" style="padding-left: 0; margin-bottom: 0;"></ul>
+  </div>
+
+  <div class="card">
+    <h3>📋 Event Log</h3>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // --- 1. EventEmitter (Observer Pattern core) ---
+    class EventEmitter {
+      constructor() { this.listeners = {}; }
+      on(event, cb) {
+        if (!this.listeners[event]) this.listeners[event] = [];
+        this.listeners[event].push(cb);
+      }
+      off(event, cb) {
+        if (!this.listeners[event]) return;
+        this.listeners[event] = this.listeners[event].filter(f => f !== cb);
+      }
+      emit(event, payload) {
+        if (this.listeners[event]) this.listeners[event].forEach(cb => cb(payload));
+      }
+    }
+
+    // --- 2. Model (data that "shouts") ---
+    class Model extends EventEmitter {
+      constructor(data) { super(); this.data = data; }
+      set(key, value) {
+        if (this.data[key] !== value) {
+          const oldValue = this.data[key];
+          this.data[key] = value;
+          this.emit('change', { key, value, oldValue });
+          this.emit('change:' + key, value);
+        }
+      }
+      get(key) { return this.data[key]; }
+    }
+
+    // --- 3. App logic ---
+    const todoModel = new Model({
+      todos: [
+        { id: 1, text: 'Learn JavaScript', done: true }, 
+        { id: 2, text: 'Learn Templates', done: false }
+      ],
+      inputValue: '',
+      filter: 'all'
+    });
+
+    const listEl = document.getElementById('todo-list');
+    const inputEl = document.getElementById('todo-input');
+    const statsEl = document.getElementById('stats');
+    const emptyEl = document.getElementById('empty-msg');
+    const logEl = document.getElementById('log');
+
+    function log(msg) {
+      const line = document.createElement('div');
+      line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      logEl.prepend(line);
+    }
+
+    function renderList() {
+      listEl.innerHTML = '';
+      const allTodos = todoModel.get('todos');
+      const filter = todoModel.get('filter');
+      
+      const todos = allTodos.filter(t => {
+        if (filter === 'active') return !t.done;
+        if (filter === 'completed') return t.done;
+        return true;
+      });
+
+      todos.forEach((todo) => {
+        const li = document.createElement('li');
+        if (todo.done) li.classList.add('done');
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'task-content';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = todo.done;
+        checkbox.addEventListener('change', () => {
+          const updated = todoModel.get('todos').map(t => 
+            t.id === todo.id ? { ...t, done: checkbox.checked } : t
+          );
+          todoModel.set('todos', updated);
+        });
+
+        const span = document.createElement('span');
+        span.textContent = todo.text;
+
+        contentDiv.appendChild(checkbox);
+        contentDiv.appendChild(span);
+        li.appendChild(contentDiv);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = '×';
+        deleteBtn.addEventListener('click', () => {
+          const updated = todoModel.get('todos').filter(t => t.id !== todo.id);
+          todoModel.set('todos', updated);
+        });
+        li.appendChild(deleteBtn);
+
+        listEl.appendChild(li);
+      });
+      const doneCount = allTodos.filter(t => t.done).length;
+      statsEl.textContent = `Done ${doneCount} / Total ${allTodos.length}`;
+      emptyEl.style.display = todos.length === 0 ? 'block' : 'none';
+      
+      // Update filter button active state
+      document.querySelectorAll('#filters button').forEach(btn => {
+        if (btn.dataset.filter === filter) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    // Binding: View → Model
+    inputEl.addEventListener('input', (e) => {
+      todoModel.set('inputValue', e.target.value);
+    });
+
+    document.getElementById('add-btn').addEventListener('click', () => {
+      const value = todoModel.get('inputValue');
+      if (!value) return;
+      const todos = todoModel.get('todos').slice();
+      todos.push({ id: Date.now(), text: value, done: false });
+      todoModel.set('todos', todos);
+      todoModel.set('inputValue', '');
+    });
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        todoModel.set('filter', e.target.dataset.filter);
+      });
+    });
+
+    // Binding: Model → View (surgical updates — the input is never recreated!)
+    todoModel.on('change:todos', (todos) => {
+      renderList();
+      log('Model.todos changed → list re-rendered (' + todos.length + ' items)');
+    });
+
+    todoModel.on('change:filter', (f) => {
+      renderList();
+      log('Model.filter changed to ' + f + ' → list re-rendered');
+    });
+
+    todoModel.on('change:inputValue', (v) => {
+      inputEl.value = v; // only update input value, don't recreate the element
+      log('Model.inputValue → "' + v + '"');
+    });
+
+    // Initialize
+    renderList();
+    log('App initialized. Input focus will NOT be lost!');
+  </script>
+</body>
+</html>

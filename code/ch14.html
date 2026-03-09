@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 14 — Context and State (Fiber Version)</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f9f9f9; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; background: white; }
+    .card h3 { margin-top: 0; }
+    button { padding: 6px 12px; cursor: pointer; margin: 4px; border-radius: 4px; border: 1px solid #ccc; background: #eee; }
+    li { padding: 8px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; list-style: none; }
+    li .task-content { display: flex; align-items: center; gap: 8px; }
+    li.done span { text-decoration: line-through; color: #999; }
+    li .delete-btn { background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    input[type="text"] { padding: 8px; width: 60%; border-radius: 4px; border: 1px solid #ccc; }
+    #stats { font-size: 14px; color: #666; margin-top: 10px; }
+    #empty-msg { color: #999; font-style: italic; font-size: 14px; margin-top: 10px; }
+    #log { background: #282c34; color: #abb2bf; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 13px; max-height: 150px; overflow-y: auto; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>State Management (Fiber & Hooks)</h1>
+  <div id="app"></div>
+  <div id="log"></div>
+
+  <script>
+    // ============================================
+    // 1. Engine: Mini-React (Fiber + Hooks)
+    // ============================================
+    function h(type, props, ...children) {
+      return {
+        type,
+        props: {
+          ...props,
+          children: children.flat().map(child =>
+            typeof child === "object" ? child : { type: "TEXT_ELEMENT", props: { nodeValue: child, children: [] } }
+          )
+        }
+      };
+    }
+
+    let workInProgress = null, currentRoot = null, wipRoot = null, deletions = null;
+    let wipFiber = null, hookIndex = null;
+
+    function render(element, container) {
+      wipRoot = { dom: container, props: { children: [element] }, alternate: currentRoot };
+      deletions = [];
+      workInProgress = wipRoot;
+    }
+
+    function workLoop(deadline) {
+      let shouldYield = false;
+      while (workInProgress && !shouldYield) {
+        workInProgress = performUnitOfWork(workInProgress);
+        shouldYield = deadline.timeRemaining() < 1;
+      }
+      if (!workInProgress && wipRoot) commitRoot();
+      requestIdleCallback(workLoop);
+    }
+    requestIdleCallback(workLoop);
+
+    function performUnitOfWork(fiber) {
+      const isFunctionComponent = fiber.type instanceof Function;
+      if (isFunctionComponent) {
+        wipFiber = fiber;
+        hookIndex = 0;
+        wipFiber.hooks = [];
+        const children = [fiber.type(fiber.props)].flat();
+        reconcileChildren(fiber, children);
+      } else {
+        if (!fiber.dom) fiber.dom = createDom(fiber);
+        reconcileChildren(fiber, fiber.props.children);
+      }
+      if (fiber.child) return fiber.child;
+      let nextFiber = fiber;
+      while (nextFiber) {
+        if (nextFiber.sibling) return nextFiber.sibling;
+        nextFiber = nextFiber.return;
+      }
+      return null;
+    }
+
+    function createDom(fiber) {
+      const dom = fiber.type === "TEXT_ELEMENT" ? document.createTextNode("") : document.createElement(fiber.type);
+      updateDom(dom, {}, fiber.props);
+      return dom;
+    }
+
+    function updateDom(dom, prevProps, nextProps) {
+      for (const k in prevProps) {
+        if (k !== 'children') {
+          if (!(k in nextProps) || prevProps[k] !== nextProps[k]) {
+            if (k.startsWith('on')) dom.removeEventListener(k.slice(2).toLowerCase(), prevProps[k]);
+            else if (!(k in nextProps)) {
+              if (k === 'className') dom.removeAttribute('class');
+              else if (k === 'style') dom.style.cssText = '';
+              else dom[k] = '';
+            }
+          }
+        }
+      }
+      for (const k in nextProps) {
+        if (k !== 'children' && prevProps[k] !== nextProps[k]) {
+          if (k.startsWith('on')) dom.addEventListener(k.slice(2).toLowerCase(), nextProps[k]);
+          else {
+            if (k === 'className') dom.setAttribute('class', nextProps[k]);
+            else if (k === 'style' && typeof nextProps[k] === 'string') dom.style.cssText = nextProps[k];
+            else dom[k] = nextProps[k];
+          }
+        }
+      }
+    }
+
+    function reconcileChildren(wipFiber, elements) {
+      let index = 0, oldFiber = wipFiber.alternate && wipFiber.alternate.child, prevSibling = null;
+      while (index < elements.length || oldFiber != null) {
+        const element = elements[index];
+        let newFiber = null;
+        const sameType = oldFiber && element && element.type === oldFiber.type;
+
+        if (sameType) newFiber = { type: oldFiber.type, props: element.props, dom: oldFiber.dom, return: wipFiber, alternate: oldFiber, effectTag: "UPDATE" };
+        if (element && !sameType) newFiber = { type: element.type, props: element.props, dom: null, return: wipFiber, alternate: null, effectTag: "PLACEMENT" };
+        if (oldFiber && !sameType) { oldFiber.effectTag = "DELETION"; deletions.push(oldFiber); }
+
+        if (oldFiber) oldFiber = oldFiber.sibling;
+        if (index === 0) wipFiber.child = newFiber;
+        else if (element) prevSibling.sibling = newFiber;
+        prevSibling = newFiber;
+        index++;
+      }
+    }
+
+    function commitRoot() {
+      deletions.forEach(commitWork);
+      commitWork(wipRoot.child);
+      commitEffects(wipRoot.child);
+      currentRoot = wipRoot;
+      wipRoot = null;
+    }
+
+    function commitWork(fiber) {
+      if (!fiber) return;
+      let domParentFiber = fiber.return;
+      while (!domParentFiber.dom) domParentFiber = domParentFiber.return;
+      const domParent = domParentFiber.dom;
+
+      if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) domParent.appendChild(fiber.dom);
+      else if (fiber.effectTag === "UPDATE" && fiber.dom != null) updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+      else if (fiber.effectTag === "DELETION") {
+        commitDeletion(fiber, domParent);
+        return;
+      }
+
+      commitWork(fiber.child);
+      commitWork(fiber.sibling);
+    }
+    
+    function commitDeletion(fiber, domParent) {
+      if (fiber.dom) domParent.removeChild(fiber.dom);
+      else commitDeletion(fiber.child, domParent);
+    }
+
+    function commitEffects(fiber) {
+      if (!fiber) return;
+      if (fiber.hooks) {
+        fiber.hooks.forEach(hook => {
+          if (hook.tag === 'effect' && hook.hasChanged && hook.callback) {
+            if (hook.cleanup) hook.cleanup();
+            hook.cleanup = hook.callback();
+          }
+        });
+      }
+      commitEffects(fiber.child);
+      commitEffects(fiber.sibling);
+    }
+
+    function useState(initial) {
+      const oldHook = wipFiber.alternate && wipFiber.alternate.hooks && wipFiber.alternate.hooks[hookIndex];
+      const hook = { 
+        state: oldHook ? oldHook.state : initial, 
+        queue: oldHook ? oldHook.queue : [],
+        setState: oldHook ? oldHook.setState : null
+      };
+      
+      hook.queue.forEach(action => hook.state = typeof action === 'function' ? action(hook.state) : action);
+      hook.queue.length = 0;
+
+      if (!hook.setState) {
+        hook.setState = action => {
+          hook.queue.push(action);
+          wipRoot = { dom: currentRoot.dom, props: currentRoot.props, alternate: currentRoot };
+          workInProgress = wipRoot;
+          deletions = [];
+        };
+      }
+      wipFiber.hooks.push(hook);
+      hookIndex++;
+      return [hook.state, hook.setState];
+    }
+
+    function useEffect(callback, deps) {
+      const oldHook = wipFiber.alternate && wipFiber.alternate.hooks && wipFiber.alternate.hooks[hookIndex];
+      let hasChanged = true;
+      if (oldHook && deps) hasChanged = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
+      const hook = { tag: 'effect', callback, deps, hasChanged, cleanup: oldHook ? oldHook.cleanup : undefined };
+      wipFiber.hooks.push(hook);
+      hookIndex++;
+    }
+
+    // ============================================
+    // 2. New: Context mechanism
+    // ============================================
+    function createContext(defaultValue) {
+      return { _currentValue: defaultValue };
+    }
+    
+    // ContextProvider only passes through children,
+    // but its Fiber node carries context and value for descendants to find via useContext
+    function ContextProvider(props) {
+      return props.children;
+    }
+
+    function useContext(contextType) {
+      let currentFiber = wipFiber;
+      // Walk up the return pointer, find nearest Provider
+      while (currentFiber) {
+        if (currentFiber.type === ContextProvider && currentFiber.props.context === contextType) {
+          return currentFiber.props.value;
+        }
+        currentFiber = currentFiber.return;
+      }
+      return contextType._currentValue;
+    }
+
+    // ============================================
+    // 3. New: Mini-Redux
+    // ============================================
+    const logEl = document.getElementById('log');
+    function log(msg) {
+      const line = document.createElement('div');
+      line.textContent = '➤ ' + msg;
+      logEl.prepend(line);
+    }
+
+    function createStore(reducer, initial) {
+      let state = initial;
+      let listeners = [];
+      return {
+        getState: () => state,
+        dispatch: (action) => {
+          state = reducer(state, action);
+          listeners.forEach(fn => fn());
+        },
+        subscribe: (fn) => {
+          listeners.push(fn);
+          return () => { listeners = listeners.filter(l => l !== fn); };
+        }
+      };
+    }
+
+    function todosReducer(state, action) {
+      switch (action.type) {
+        case 'ADD_TODO':
+          log('dispatch: ADD_TODO "' + action.text + '"');
+          return { ...state, todos: [...state.todos, { text: action.text, done: false }] };
+        case 'REMOVE_TODO':
+          log('dispatch: REMOVE_TODO index=' + action.index);
+          return { ...state, todos: state.todos.filter((_, i) => i !== action.index) };
+        case 'TOGGLE_TODO':
+          log('dispatch: TOGGLE_TODO index=' + action.index);
+          return {
+            ...state,
+            todos: state.todos.map((t, i) => i === action.index ? { ...t, done: !t.done } : t)
+          };
+        default:
+          return state;
+      }
+    }
+
+    const store = createStore(todosReducer, { 
+      todos: [
+        { text: 'Learn React', done: true }, 
+        { text: 'Build Mini-React', done: false }
+      ] 
+    });
+
+    // Custom Hook: connect external Redux Store to Fiber's render mechanism
+    // useEffect subscribes to store on mount, unsubscribes on unmount (cleanup function)
+    function useStore(store) {
+      const [state, setState] = useState(store.getState());
+      
+      useEffect(() => {
+        const unsubscribe = store.subscribe(() => {
+          setState(store.getState());
+        });
+        return unsubscribe;
+      }, [store]); 
+      
+      return state;
+    }
+
+    // ============================================
+    // 4. App
+    // ============================================
+    const ThemeContext = createContext('#0066cc');
+
+    function TodoApp() {
+      const state = useStore(store); 
+      const [inputValue, setInputValue] = useState('');
+
+      const doneCount = state.todos.filter(t => t.done).length;
+
+      return h('div', { className: 'card' },
+        h('h3', null, 'My Todo List (Fiber & Hooks)'),
+        h('div', null,
+          h('input', { 
+            type: 'text',
+            placeholder: 'Add a task', 
+            value: inputValue, 
+            oninput: e => setInputValue(e.target.value) 
+          }),
+          h('button', { 
+            id: 'add-btn',
+            onclick: () => {
+              if (!inputValue.trim()) return;
+              store.dispatch({ type: 'ADD_TODO', text: inputValue });
+              setInputValue('');
+            }
+          }, 'Add')
+        ),
+        h('p', { id: 'stats' }, `Done ${doneCount} / Total ${state.todos.length}`),
+        h('p', { id: 'empty-msg', style: `display: ${state.todos.length === 0 ? 'block' : 'none'}` }, 'No data'),
+        h('ul', { style: 'padding-left: 0; margin-bottom: 0;' }, state.todos.map((todo, i) => h(TodoItem, { text: todo.text, done: todo.done, index: i })))
+      );
+    }
+
+    function TodoItem({ text, done, index }) {
+      // useContext: walks up Fiber.return chain to find ThemeContext's Provider — no Props needed!
+      const themeColor = useContext(ThemeContext);
+      
+      return h('li', done ? { className: 'done' } : null,
+        h('div', { className: 'task-content' }, 
+          h('input', Object.assign({ type: 'checkbox', onchange: () => store.dispatch({ type: 'TOGGLE_TODO', index }) }, done ? { checked: true } : {})), 
+          h('span', { style: `color: ${done ? '#999' : themeColor}; font-weight: bold;` }, text)
+        ),
+        h('button', { className: 'delete-btn', onclick: () => store.dispatch({ type: 'REMOVE_TODO', index }) }, '×')
+      );
+    }
+
+    function App() {
+      const [isBlue, setIsBlue] = useState(true);
+      const currentColor = isBlue ? '#0066cc' : '#cc6600';
+
+      return h('div', null,
+        // ContextProvider wraps the subtree; value changes are picked up by useContext on next render
+        h(ContextProvider, { context: ThemeContext, value: currentColor },
+          h('div', { className: 'card' },
+            h('h3', null, 'Context API Demo'),
+            h('p', null, 'The todo list text color below is passed directly across layers via Fiber.return:'),
+            h('div', { style: `padding: 10px; border-radius: 4px; color: white; background: ${currentColor}` },
+              `Current global color: ${currentColor}`
+            ),
+            h('button', { onclick: () => setIsBlue(!isBlue), style: 'margin-top: 10px' }, 'Toggle Theme Color')
+          ),
+          h(TodoApp, null)
+        )
+      );
+    }
+
+    render(h(App, null), document.getElementById('app'));
+    log('App started and running in Fiber architecture');
+  </script>
+</body>
+</html>

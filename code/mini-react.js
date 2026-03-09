@@ -1,324 +1,458 @@
 /**
- * mini-react.js — The Way of React: Cumulative Engine
- * 
- * This file contains the complete Mini-React engine built across the book:
- * - Ch05: h(), mount(), patch() — Virtual DOM core
- * - Ch06: Component class, component support in mount/patch
- * - Ch07: setState, componentDidMount, componentWillUnmount
- * - Ch09: useState, useEffect, useRef, renderApp (Hooks)
- * - Ch10: createStore (Mini-Redux), createContext, useContext, useMemo
- * 
- * ⚠️ IMPORTANT: The class-based system (Ch06-07) and the Hooks system (Ch09)
- * are ALTERNATIVE approaches, not meant to be used simultaneously.
- * - mount() uses `new vnode.tag()` which works for class components but will
- *   crash with plain function components from Ch09.
- * - Ch09's demos use a separate, simplified mount/patch that strips out
- *   the class branch. See each chapter's HTML demo for self-contained versions.
+ * mini-react.js — The Way of React (Modern Fiber Architecture)
+ *
+ * Complete source of the modern Fiber engine built in chapters 9-15.
+ * Contains Fiber architecture, Time-Slicing, and Hooks attached to Fiber nodes.
+ * This engine completely replaces the synchronous recursive Stack Reconciler
+ * built in chapters 1-8.
  */
 
 // ============================================
-// Chapter 5: Virtual DOM Core
+// Virtual DOM factory
 // ============================================
 
-/** Create a virtual node */
-function h(tag, props, children) {
-  return { tag, props: props || {}, children: children || [] };
+export function h(type, props, ...children) {
+  return {
+    type,
+    props: {
+      ...props,
+      // .flat() handles nested arrays (e.g., children that contain arrays)
+      // Text nodes are uniformly wrapped as objects so the Fiber traversal
+      // algorithm can treat them all the same
+      children: children.flat().map(child =>
+        typeof child === "object"
+          ? child
+          : createTextElement(child)
+      ),
+    },
+  };
 }
 
-/** Mount a VNode to a real DOM container */
-function mount(vnode, container) {
-  // Text nodes
-  if (typeof vnode === 'string' || typeof vnode === 'number') {
-    container.appendChild(document.createTextNode(vnode));
-    return;
+// Wrap string/number text into uniformly formatted VNode objects
+// Chapter demos inline this logic in h() — completely equivalent
+function createTextElement(text) {
+  return {
+    type: "TEXT_ELEMENT",
+    props: {
+      nodeValue: text,
+      children: [],
+    },
+  };
+}
+
+// ============================================
+// Global state variables (engine "dashboard")
+// ============================================
+
+let workInProgress = null; // traversal cursor: Fiber node currently waiting to be processed
+let currentRoot = null;    // completed blueprint: the last committed Fiber tree
+let wipRoot = null;        // draft paper: root of the new Fiber tree being built
+let deletions = null;      // list of old Fiber nodes to delete
+
+let wipFiber = null;       // Fiber node of the function component currently executing
+let hookIndex = null;      // which Hook call we're on ("which drawer")
+
+// ============================================
+// Public API
+// ============================================
+
+export function render(element, container) {
+  // Create draft root node, connect to old tree (currentRoot is null on first mount)
+  wipRoot = {
+    dom: container,
+    props: {
+      children: [element],
+    },
+    alternate: currentRoot,
+  };
+  deletions = [];
+  workInProgress = wipRoot;
+}
+
+// ============================================
+// Work loop (core of time slicing)
+// ============================================
+
+function workLoop(deadline) {
+  let shouldYield = false;
+
+  // While there's work AND the browser has idle time, keep executing
+  while (workInProgress && !shouldYield) {
+    workInProgress = performUnitOfWork(workInProgress);
+    shouldYield = deadline.timeRemaining() < 1;
   }
 
-  // Component nodes (Ch06)
-  if (typeof vnode.tag === 'function') {
-    const instance = new vnode.tag(vnode.props);
-    vnode._instance = instance;
-    const subTree = instance.render();
-    instance._vnode = subTree;
-    mount(subTree, container);
-    vnode.el = subTree.el;
-    // Lifecycle: componentDidMount (Ch07)
-    if (instance.componentDidMount) {
-      instance.componentDidMount();
-    }
-    return;
+  // Cursor reached null means Render Phase ended — enter Commit Phase synchronously
+  if (!workInProgress && wipRoot) {
+    commitRoot();
   }
 
-  // HTML element nodes
-  const el = (vnode.el = document.createElement(vnode.tag));
+  // After yielding main thread, wait for next idle frame to continue
+  requestIdleCallback(workLoop);
+}
 
-  // Props
-  for (const key in vnode.props) {
-    if (key.startsWith('on')) {
-      el.addEventListener(key.slice(2).toLowerCase(), vnode.props[key]);
-    } else {
-      el.setAttribute(key, vnode.props[key]);
-    }
-  }
+requestIdleCallback(workLoop);
 
-  // Children
-  if (typeof vnode.children === 'string') {
-    el.textContent = vnode.children;
+// Process single Fiber node, return the next node to process
+function performUnitOfWork(fiber) {
+  const isFunctionComponent = fiber.type instanceof Function;
+
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
   } else {
-    (vnode.children || []).forEach(child => {
-      if (typeof child === 'string' || typeof child === 'number') {
-        el.appendChild(document.createTextNode(child));
-      } else {
-        mount(child, el);
+    updateHostComponent(fiber);
+  }
+
+  // Navigate to next node: prefer child, then sibling, then uncle
+  if (fiber.child) return fiber.child;
+
+  let nextFiber = fiber;
+  while (nextFiber) {
+    if (nextFiber.sibling) return nextFiber.sibling;
+    nextFiber = nextFiber.return; // ← return pointer, points to parent node
+  }
+  return null;
+}
+
+// ============================================
+// Component updates and child reconciliation
+// ============================================
+
+function updateFunctionComponent(fiber) {
+  // Set global pointers so useState/useEffect know which Fiber's which drawer
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = [];
+
+  // Execute function component, get children (.flat() handles array returns)
+  const children = [fiber.type(fiber.props)].flat();
+  reconcileChildren(fiber, children);
+}
+
+function updateHostComponent(fiber) {
+  // Native DOM node: create real DOM (don't mount, Commit Phase handles that)
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  reconcileChildren(fiber, fiber.props.children);
+}
+
+// Reconcile children: compare new VNodes with old Fibers, tag with effectTag
+function reconcileChildren(wipFiber, elements) {
+  let index = 0;
+  let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
+  let prevSibling = null;
+
+  // Loop condition: new elements not done OR old Fibers not done
+  // — both sides must reach the end to detect extra old nodes
+  while (index < elements.length || oldFiber != null) {
+    const element = elements[index];
+    let newFiber = null;
+
+    const sameType = oldFiber && element && element.type === oldFiber.type;
+
+    if (sameType) {
+      // Same type: reuse old DOM, only update props
+      newFiber = {
+        type: oldFiber.type,
+        props: element.props,
+        dom: oldFiber.dom,      // directly reuse old real DOM node
+        return: wipFiber,       // ← return, points to parent node
+        alternate: oldFiber,    // connect old Fiber, Commit uses it to compare old props
+        effectTag: "UPDATE",
+      };
+    }
+    if (element && !sameType) {
+      // New element but different type (or no old node): create fresh
+      newFiber = {
+        type: element.type,
+        props: element.props,
+        dom: null,
+        return: wipFiber,       // ← return, points to parent node
+        alternate: null,
+        effectTag: "PLACEMENT",
+      };
+    }
+    if (oldFiber && !sameType) {
+      // Old node but no corresponding new element (or different type): mark for deletion
+      oldFiber.effectTag = "DELETION";
+      deletions.push(oldFiber);
+    }
+
+    if (oldFiber) oldFiber = oldFiber.sibling;
+
+    if (index === 0) {
+      wipFiber.child = newFiber;
+    } else if (element) {
+      prevSibling.sibling = newFiber;
+    }
+
+    prevSibling = newFiber;
+    index++;
+  }
+}
+
+// ============================================
+// Commit Phase (synchronously, non-interruptibly write changes to real DOM)
+// ============================================
+
+function commitRoot() {
+  // Handle deletions first (deleted old Fibers aren't in new tree, need separate handling)
+  deletions.forEach(commitWork);
+  // Then handle additions and updates
+  commitWork(wipRoot.child);
+  // After all DOM work, trigger side effects together
+  commitEffects(wipRoot.child);
+
+  // New tree becomes current tree, draft paper cleared
+  currentRoot = wipRoot;
+  wipRoot = null;
+}
+
+function commitWork(fiber) {
+  if (!fiber) return;
+
+  // Find the nearest ancestor with real DOM.
+  // Function components have no DOM, need to skip up until finding a native node.
+  let domParentFiber = fiber.return; // ← return, points to parent node
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.return; // ← return
+  }
+  const domParent = domParentFiber.dom;
+
+  if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
+    // New: mount DOM to page
+    domParent.appendChild(fiber.dom);
+  } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
+    // Update: only modify changed props and event listeners
+    updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+  } else if (fiber.effectTag === "DELETION") {
+    // Delete: remove old DOM, return immediately without recursing deleted subtree
+    // (old subtree children may have stale effectTags; continuing would re-insert "zombie nodes")
+    commitDeletion(fiber, domParent);
+    return;
+  }
+
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
+}
+
+function commitDeletion(fiber, domParent) {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom);
+  } else {
+    // Function component has no dom, search child for real DOM node
+    commitDeletion(fiber.child, domParent);
+  }
+}
+
+// Traverse entire Fiber tree, execute all pending side effects after DOM work is complete
+function commitEffects(fiber) {
+  if (!fiber) return;
+
+  if (fiber.hooks) {
+    fiber.hooks.forEach(hook => {
+      // Use tag === 'effect' to distinguish useEffect hooks from useState hooks
+      if (hook.tag === 'effect' && hook.hasChanged && hook.callback) {
+        // First run the cleanup function from last side effect
+        if (hook.cleanup) hook.cleanup();
+        // Run new side effect, save return value as next cleanup
+        hook.cleanup = hook.callback();
       }
     });
   }
 
-  container.appendChild(el);
+  commitEffects(fiber.child);
+  commitEffects(fiber.sibling);
 }
 
-/** Diff and patch: update real DOM with minimal changes */
-function patch(oldVNode, newVNode) {
-  // Component nodes (Ch06)
-  if (typeof newVNode.tag === 'function') {
-    if (oldVNode.tag === newVNode.tag) {
-      const instance = (newVNode._instance = oldVNode._instance);
-      instance.props = newVNode.props;
-      const oldSubTree = instance._vnode;
-      const newSubTree = instance.render();
-      instance._vnode = newSubTree;
-      patch(oldSubTree, newSubTree);
-      newVNode.el = newSubTree.el;
-    } else {
-      const parent = oldVNode.el.parentNode;
-      mount(newVNode, parent);
-      parent.replaceChild(newVNode.el, oldVNode.el);
-    }
-    return;
-  }
+// ============================================
+// DOM utility functions
+// ============================================
 
-  // Different tag types → replace
-  if (oldVNode.tag !== newVNode.tag) {
-    const parent = oldVNode.el.parentNode;
-    const tmp = document.createElement('div');
-    mount(newVNode, tmp);
-    parent.replaceChild(newVNode.el, oldVNode.el);
-    return;
-  }
+function createDom(fiber) {
+  const dom = fiber.type === "TEXT_ELEMENT"
+    ? document.createTextNode("")
+    : document.createElement(fiber.type);
+  updateDom(dom, {}, fiber.props);
+  return dom;
+}
 
-  // Same tag → update in place
-  const el = (newVNode.el = oldVNode.el);
-  const oldProps = oldVNode.props || {};
-  const newProps = newVNode.props || {};
-
-  // Update/add props
-  for (const key in newProps) {
-    if (oldProps[key] !== newProps[key]) {
-      if (key.startsWith('on')) {
-        const eventName = key.slice(2).toLowerCase();
-        if (oldProps[key]) el.removeEventListener(eventName, oldProps[key]);
-        el.addEventListener(eventName, newProps[key]);
-      } else {
-        el.setAttribute(key, newProps[key]);
-      }
-    }
-  }
-
-  // Remove old props
-  for (const key in oldProps) {
-    if (!(key in newProps)) {
-      if (key.startsWith('on')) {
-        el.removeEventListener(key.slice(2).toLowerCase(), oldProps[key]);
-      } else {
-        el.removeAttribute(key);
-      }
-    }
-  }
-
-  // Children diffing
-  const oldCh = oldVNode.children || [];
-  const newCh = newVNode.children || [];
-
-  if (typeof newCh === 'string') {
-    if (oldCh !== newCh) el.textContent = newCh;
-  } else if (typeof oldCh === 'string') {
-    el.textContent = '';
-    newCh.forEach(c => mount(c, el));
-  } else {
-    const commonLen = Math.min(oldCh.length, newCh.length);
-    for (let i = 0; i < commonLen; i++) {
-      const oc = oldCh[i], nc = newCh[i];
-      if ((typeof oc === 'string' || typeof oc === 'number') &&
-        (typeof nc === 'string' || typeof nc === 'number')) {
-        if (oc !== nc) el.childNodes[i].textContent = nc;
-      } else if (typeof oc === 'object' && typeof nc === 'object') {
-        patch(oc, nc);
-      } else {
-        // Type changed
-        if (typeof nc === 'string' || typeof nc === 'number') {
-          el.replaceChild(document.createTextNode(nc), el.childNodes[i]);
-        } else {
-          const tmp = document.createElement('div');
-          mount(nc, tmp);
-          el.replaceChild(nc.el, el.childNodes[i]);
+function updateDom(dom, prevProps, nextProps) {
+  // First pass: remove old props and event listeners
+  for (const k in prevProps) {
+    if (k !== 'children') {
+      if (!(k in nextProps) || prevProps[k] !== nextProps[k]) {
+        if (k.startsWith('on')) {
+          dom.removeEventListener(k.slice(2).toLowerCase(), prevProps[k]);
+        } else if (!(k in nextProps)) {
+          // Old has it, new doesn't: clear the prop
+          if (k === 'className') dom.removeAttribute('class');
+          else if (k === 'style') dom.style.cssText = '';
+          else dom[k] = '';
         }
       }
     }
-    if (newCh.length > oldCh.length) {
-      newCh.slice(oldCh.length).forEach(c => mount(c, el));
-    }
-    if (newCh.length < oldCh.length) {
-      for (let i = oldCh.length - 1; i >= commonLen; i--) {
-        el.removeChild(el.childNodes[i]);
+  }
+  // Second pass: set new props and event listeners
+  for (const k in nextProps) {
+    if (k !== 'children' && prevProps[k] !== nextProps[k]) {
+      if (k.startsWith('on')) {
+        dom.addEventListener(k.slice(2).toLowerCase(), nextProps[k]);
+      } else {
+        if (k === 'className') dom.setAttribute('class', nextProps[k]);
+        else if (k === 'style' && typeof nextProps[k] === 'string') dom.style.cssText = nextProps[k];
+        else dom[k] = nextProps[k];
       }
     }
   }
 }
 
-
 // ============================================
-// Chapter 6-7: Component System
-// ============================================
-
-class Component {
-  constructor(props) {
-    this.props = props || {};
-    this.state = {};
-  }
-
-  setState(newState) {
-    this.state = Object.assign({}, this.state, newState);
-    this._update();
-  }
-
-  _update() {
-    if (!this._vnode) return;
-    const oldVNode = this._vnode;
-    const newVNode = this.render();
-    patch(oldVNode, newVNode);
-    this._vnode = newVNode;
-  }
-
-  render() {
-    throw new Error('Component must implement render()');
-  }
-}
-
-
-// ============================================
-// Chapter 9: Hooks
+// Hooks API
 // ============================================
 
-let _hooks = [];
-let _hookIndex = 0;
-let _currentRenderFn = null;
-let _currentVNode = null;
-let _currentContainer = null;
+export function useState(initial) {
+  // Get last hook object from same drawer in old Fiber
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
 
-function useState(initialValue) {
-  const idx = _hookIndex;
-  if (_hooks[idx] === undefined) {
-    _hooks[idx] = initialValue;
-  }
-  const setState = (newValue) => {
-    _hooks[idx] = newValue;
-    _rerender();
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: oldHook ? oldHook.queue : [],
+    setState: oldHook ? oldHook.setState : null,
   };
-  _hookIndex++;
-  return [_hooks[idx], setState];
+
+  // Settle queue: apply all pending updates to state in order
+  hook.queue.forEach(action => {
+    hook.state = typeof action === 'function'
+      ? action(hook.state)  // supports functional update: setCount(c => c + 1)
+      : action;             // also supports direct assignment: setCount(5)
+  });
+  hook.queue.length = 0;
+
+  // Create setState on first render (reuse same function reference afterwards)
+  if (!hook.setState) {
+    hook.setState = action => {
+      hook.queue.push(action);
+      // Create new wipRoot (draft paper), trigger new Render Phase
+      wipRoot = {
+        dom: currentRoot.dom,
+        props: currentRoot.props,
+        alternate: currentRoot,
+      };
+      workInProgress = wipRoot;
+      deletions = [];
+    };
+  }
+
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+  return [hook.state, hook.setState];
 }
 
-function useEffect(callback, deps) {
-  const idx = _hookIndex;
-  const prevDeps = _hooks[idx];
+export function useReducer(reducer, initialState) {
+  // useReducer is syntax sugar for useState:
+  // extract "how to update" from scattered setState calls into one reducer function
+  const [state, setState] = useState(initialState);
+
+  function dispatch(action) {
+    setState(prevState => reducer(prevState, action));
+  }
+
+  return [state, dispatch];
+}
+
+export function useEffect(callback, deps) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+
+  // Compare dependency array, judge if side effect needs re-running
   let hasChanged = true;
-  if (prevDeps) {
-    hasChanged = deps
-      ? deps.some((dep, i) => dep !== prevDeps[i])
-      : true;
+  if (oldHook && deps) {
+    hasChanged = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
   }
-  if (hasChanged) {
-    if (_hooks[idx + 1]) _hooks[idx + 1](); // cleanup
-    const cleanup = callback();
-    _hooks[idx + 1] = cleanup;
-  }
-  _hooks[idx] = deps;
-  _hookIndex += 2;
+
+  const hook = {
+    tag: 'effect',  // ← tag type, lets commitEffects distinguish useState and useEffect hooks
+    callback,
+    deps,
+    hasChanged,
+    cleanup: oldHook ? oldHook.cleanup : undefined,
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex++;
 }
 
-function useMemo(factory, deps) {
-  const idx = _hookIndex;
-  const prevDeps = _hooks[idx];
+export function useMemo(factory, deps) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+
   let hasChanged = true;
-  if (prevDeps) {
-    hasChanged = deps.some((dep, i) => dep !== prevDeps[i]);
+  if (oldHook && deps) {
+    hasChanged = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
   }
-  if (hasChanged) {
-    _hooks[idx + 1] = factory();
-  }
-  _hooks[idx] = deps;
-  _hookIndex += 2;
-  return _hooks[idx + 1];
+
+  const hook = {
+    // Deps changed: recompute now; unchanged: return last cached result
+    value: hasChanged ? factory() : oldHook.value,
+    deps,
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+  return hook.value;
 }
 
-function useRef(initialValue) {
-  // useRef is just a useMemo that returns a persistent mutable container.
-  // The empty deps array [] ensures it's created once and never recalculated.
-  return useMemo(() => ({ current: initialValue }), []);
+export function useCallback(callback, deps) {
+  // useCallback is useMemo syntax sugar for caching function references
+  return useMemo(() => callback, deps);
 }
 
-function _rerender() {
-  _hookIndex = 0;
-  const newVNode = _currentRenderFn();
-  if (_currentVNode) {
-    patch(_currentVNode, newVNode);
-  } else {
-    mount(newVNode, _currentContainer);
-  }
-  _currentVNode = newVNode;
+export function useRef(initialValue) {
+  // useRef is essentially useState that never calls setState
+  // Directly modifying ref.current doesn't trigger re-render
+  const [ref] = useState({ current: initialValue });
+  return ref;
 }
-
-function renderApp(fn, container) {
-  _currentRenderFn = fn;
-  _currentContainer = container;
-  _rerender();
-}
-
 
 // ============================================
-// Chapter 10: State Management
+// Context API (chapter 14)
 // ============================================
 
-/** Mini-Redux store */
-function createStore(reducer, initialState) {
-  let state = initialState;
-  let listeners = [];
-
+export function createContext(defaultValue) {
   return {
-    getState: () => state,
-    dispatch: (action) => {
-      state = reducer(state, action);
-      listeners.forEach(fn => fn());
-    },
-    subscribe: (fn) => {
-      listeners.push(fn);
-      return () => { listeners = listeners.filter(l => l !== fn); };
-    }
+    _currentValue: defaultValue, // fallback default value when no Provider wraps
   };
 }
 
-/** Simplified Context */
-function createContext(defaultValue) {
-  const context = {
-    _value: defaultValue,
-    _subscribers: [],
-    Provider: (props) => {
-      context._value = props.value;
-      context._subscribers.forEach(fn => fn());
-    }
-  };
-  return context;
+// ContextProvider is a special wrapper component:
+// it just passes through children, but its Fiber node carries context and value,
+// for descendant components to "claim" when they walk up the return chain
+export function ContextProvider(props) {
+  return props.children;
 }
 
-function useContext(context) {
-  return context._value;
+export function useContext(contextType) {
+  // Walk up the return pointer, looking for the nearest ContextProvider
+  let currentFiber = wipFiber;
+  while (currentFiber) {
+    if (
+      currentFiber.type === ContextProvider &&
+      currentFiber.props.context === contextType
+    ) {
+      // Found it! Take value from this ancestor's props
+      return currentFiber.props.value;
+    }
+    currentFiber = currentFiber.return; // ← return, walk upward
+  }
+  // Walked all the way to root without finding a Provider — return createContext's default
+  return contextType._currentValue;
 }

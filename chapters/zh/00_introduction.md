@@ -1,72 +1,59 @@
-# Preface: The Way
+# 前言：The Way
 
-> *"What I cannot create, I do not understand."*
-> *——Richard Feynman*
-
----
-
-## What This Book Is About
-
-In this book, you will **reinvent React from scratch, with your own hands**.
-
-Not by learning React's API, but by **retracing the path along which React was invented**. You'll start from the most primitive `document.createElement`, experience every pain point firsthand, and naturally derive solutions from that pain — solutions that turn out to be the core design decisions of React itself.
-
-```
-Ch01  document.createElement     → Feel the pain of imperative code
-Ch02  render(template, data)     → Invent declarative templates
-Ch03  EventEmitter + Model       → Create Observer-pattern data binding
-Ch04  UI = f(state)              → Discover React's core idea
-Ch05  h() + mount() + patch()    → Implement a Virtual DOM engine
-Ch06  Component + Props          → Build a component system
-Ch07  setState + Lifecycle       → Give components memory and a sense of time
-Ch08  HOC + Render Props         → Experience the struggles of class-based logic reuse
-Ch09  useState + useEffect       → Invent Hooks
-Ch10  createStore + Context      → Build state management solutions
-Ch11  requestIdleCallback        → Understand concurrent scheduling & Suspense
-```
-
-Every chapter follows the same pattern: **feel the problem first, then derive the solution, then build it yourself**. By the end, you'll realize — React is not magic. It is the crystallization of a series of elegant engineering trade-offs.
-
-## Who This Book Is For
-
-This book assumes you have a **working knowledge of JavaScript, HTML, and the DOM**. You should be comfortable with variables, functions, classes, closures, and basic DOM operations like `document.createElement` and `addEventListener`.
-
-However, you **do not need any prior experience with React** — or any other frontend framework. We will not reference React's API without first building it ourselves. Every concept is derived from first principles in the dialogue.
-
-This is a **self-contained** journey. If you know JavaScript and the browser, you have everything you need. No prior reading, no prerequisites beyond the language itself.
-
-## Writing Style: Socratic Dialogue
-
-This book is written entirely in **dialogue form**, carried by two characters:
-
-- **Master**: A mentor deeply versed in the evolution of frontend technology. He never gives answers directly; instead, he guides Student to derive solutions through questions and nudges.
-- **Student**: A sharp programmer with no React experience. He has a solid JavaScript foundation, is endlessly curious, and asks great questions.
-
-This approach draws inspiration from two traditions:
-
-**The Socratic Method** — guiding learners to discover truth through dialogue and questioning, rather than passively receiving knowledge. Master never says "React uses a Virtual DOM." He asks: "If you re-render the entire UI every time, but don't want to rebuild the whole DOM tree, what would you do?" — and Student derives the concept of a Virtual DOM on his own.
-
-**The writing style of *Operating Systems: Three Easy Pieces*** — Remzi and Andrea Arpaci-Dusseau's OS textbook uses light-hearted dialogue and carefully designed experiments to make complex OS concepts approachable. OSTEP demonstrated something important: **the most profound technical knowledge can be conveyed in the most natural language.** This book pursues the same quality — you don't need to sit up straight and "study." Just follow the conversation between Student and Master, as if you're listening to a story unfold.
-
-At the end of each chapter, you'll find a **fully runnable HTML file** — open it directly in your browser, interact with it, and verify everything you've learned. No npm, no webpack, no build tools whatsoever. Just pure JavaScript and your browser.
-
-## Learn React, but not only React
-
-Today's frontend world is more complex than ever. SolidJS, Svelte, Qwik, Angular Signals — new frameworks and paradigms emerge constantly, each claiming to be faster and better than React.
-
-In such times, **memorizing React APIs is the worst possible learning strategy.**
-
-Because APIs change. `componentDidMount` has already been replaced by `useEffect`. Class Components have given way to Function Components. Tomorrow, perhaps `useEffect` itself will step aside.
-
-**What doesn't change are the engineering trade-offs behind them:**
-
-- Declarative vs. Imperative
-- Full re-render vs. Fine-grained updates
-- Runtime flexibility vs. Compile-time optimization
-- Developer experience vs. Runtime performance
-
-Once you understand the trade-offs across these dimensions, you don't just understand React — you understand the **design space of all UI frameworks**. No matter what future frameworks are called, you'll be able to grasp their core ideas quickly, because you've already walked the path from first principles.
+> *"凡是我不能亲手实现的，我就没有真正理解它。"*
+> *——理查德·费曼 (Richard Feynman)*
 
 ---
 
-*Turn the page. Let's start with a single line of `document.createElement`.*
+## 这本书关于什么
+
+在这本书中，你将**亲手从零开始重新发明 React**。
+
+不是学习 React 的 API 怎么用，而是**重走一遍 React 被发明出来的整条演化道路**。你将从最原始的 `document.createElement` 起步，亲身经历每一个痛点，并自然地从痛点中推导出解决方案——最终你会发现，这些解决方案正是 React 的核心架构设计理念。
+
+每一章都遵循同样的模式：**先感受痛点，然后推导出解决方案，最后亲手把它写出来**。到最后你会得到一个约 **400 行** 的 mini-react, 它“麻雀虽小，五脏俱全”，包含了 Virtual DOM、时间切片（Time Slicing）、Fiber 协调（Reconciliation）、同步提交（Commit）以及核心 Hooks。
+
+## 写作风格：苏格拉底式对话
+
+这本书完全以**对话的形式**展开，由两位角色推动：
+
+- **Shifu (🧙‍♂️)**：一位对前端技术演变史了如指掌的智者。他不会直接告诉你死记硬背的答案，而是通过层层递进的问题和引导，让 Po 自己把答案推想出来。
+- **Po (🐼)**：一位没有 React 经验、但基本功扎实、充满好奇心、且善于提出好问题的聪明熊猫。
+
+这种叙事方式汲取了两大灵感来源：
+
+**苏格拉底式教学法**——通过提问引导学生去发现真理，而不是被动地灌输知识。Shifu 永远不会一上来就说：“React 使用了 Virtual DOM”。他会问：“如果每次状态改变你都要重绘整个界面，但你又不想把整棵真实的 DOM 树推倒重来，你会怎么做？”——然后 Po 会靠自己的直觉，一步步推导出 Virtual DOM 的概念。
+
+***《操作系统导论》(OSTEP)* 的行文风格**——Remzi 和 Andrea Arpaci-Dusseau 撰写的这本 OS 教科书，巧妙地利用轻松的对话和精心设计的代码，将极其复杂的操作系统概念变得平易近人。OSTEP 表明了一件事：**最深奥的技术原理，是可以用最自然的大白话讲述出来的。** 本书同样追求这种阅读体验——你不需要正襟危坐地“啃书”。只要像听相声、看故事一样，跟随着 Po 和 Shifu 的对话一路走下去就好。
+
+在每一章的结尾，你都会带走一个**数百行内完全可运行的 HTML 文件**——你可以直接双击在浏览器里打开它，修改代码，验证你刚刚学到的所有东西。不需要 npm，不需要 webpack，也没有任何让人头疼的工程化构建工具。只有纯粹的 JavaScript 和你的浏览器
+
+## 这本书写给谁
+
+本书假设你具备基本的 JavaScript、HTML 和 DOM 操作知识。
+你可能从未接触过 React，甚至从未使用过任何前端框架，只是想从零开始，建立一套清晰的 React 心智模型。
+也可能你在工作中大量使用过 React，却对它的工作原理知之甚少，想揭开这个黑盒的盖子，看看里面究竟藏着什么。
+无论哪种情况，这本书都为你而写。
+
+我们会亲手把 React 的机制一点点搭建出来。所有概念都在对话中从第一性原理推导而来，步步有据可循。
+这是一段自成体系的旅程。只要你懂 JavaScript，就已备齐了所有行囊，可以出发。
+
+## 超越 React
+
+今天的前端世界比以往任何时候都要喧嚣。SolidJS、Svelte、Qwik、Angular Signals——新的框架和范式层出不穷。
+
+在这样的时代，**死记硬背 React 的 API 是最糟糕的学习策略。** 因为 API 是会变的。
+
+**但永远不会轻易改变的，是隐藏在它们背后的工程权衡 ：**
+
+- 声明式 (Declarative) vs. 命令式 (Imperative)
+- 全量重绘 (Full re-render) vs. 细粒度更新 (Fine-grained updates)
+- 运行时灵活性 (Runtime flexibility) vs. 编译时优化 (React Compiler / Forget)
+- 时间切片下的并发调度 (Concurrent Mode) vs. 传统的同步渲染
+- 客户端 Hydration 的代价 vs. 服务端组件 (RSC) 的零 Bundle 理想
+
+一旦你理解了这些维度上的权衡与取舍，你理解的就不再仅仅是 React——你洞穿的是**所有 UI 框架的设计考量**。不管未来跑出来的新框架是什么，你都能一瞬间看透它们底层的核心思想，因为在通往第一性原理的道路上，你早就把它们亲手捏了一遍。
+
+---
+
+*翻开下一页。让我们暂时忘掉那些高级 API，从一行孤单的 `document.createElement` 开始讲起。*

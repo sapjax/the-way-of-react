@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 4 — The Big Idea</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 13px; }
+    button { padding: 8px 16px; font-size: 16px; margin-top: 10px; cursor: pointer; }
+    .note { color: #999; font-size: 13px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>UI = f(state)</h1>
+  <p>Click the button and watch the Virtual DOM object change with state.
+     Note: we're still using innerHTML in this chapter (next chapter will replace it with patch).</p>
+  
+  <div id="app">
+    <!-- UI will render here -->
+  </div>
+  
+  <h3>Current Virtual DOM snapshot:</h3>
+  <pre id="vdom-display"></pre>
+
+  <p class="note">💡 The button's onclick in the VNode is a function reference (not a string),
+    which is safer than the template era's <code>onclick="increment()"</code> (no XSS risk)
+    and more efficient (can compare references with ===).</p>
+
+  <script>
+    // 1. State
+    const state = {
+      count: 0
+    };
+
+    let prevSnapshot = null;
+
+    // 2. Returns a JS object (Virtual DOM) instead of a template string
+    // This is the prototype of React.createElement
+    function render(state) {
+      return {
+        tag: 'div',
+        props: { style: 'border: 1px solid #ccc; padding: 10px;' },
+        children: [
+          {
+            tag: 'h1',
+            props: { style: 'color: #333' },
+            children: ['Count: ' + state.count]
+          },
+          {
+            tag: 'p',
+            props: {},
+            children: ['The UI is a function of state.']
+          },
+          {
+            tag: 'button',
+            props: { onclick: increment }, // function reference!
+            children: ['Add']
+          }
+        ]
+      };
+    }
+
+    function increment() {
+      state.count++;
+      updateApp();
+    }
+
+    // 3. Simulate rendering
+    // ⚠️ Still using innerHTML here — next chapter's patch will replace it
+    function updateApp() {
+      const vnode = render(state);
+      
+      const display = document.getElementById('vdom-display');
+      const newJson = JSON.stringify(vnode, (key, val) => typeof val === 'function' ? '[Function: ' + val.name + ']' : val, 2);
+      
+      if (prevSnapshot) {
+        // Highlight diff
+        const oldLines = prevSnapshot.split('\n');
+        const newLines = newJson.split('\n');
+        let diffHtml = '';
+        const maxLen = Math.max(oldLines.length, newLines.length);
+        for (let i = 0; i < maxLen; i++) {
+          const ol = oldLines[i] || '';
+          const nl = newLines[i] || '';
+          if (ol !== nl) {
+            diffHtml += '<span style="background:#ffe0e0;text-decoration:line-through;">' + ol.replace(/</g,'&lt;') + '</span>\n';
+            diffHtml += '<span style="background:#e0ffe0;font-weight:bold;">' + nl.replace(/</g,'&lt;') + '</span>\n';
+          } else {
+            diffHtml += nl.replace(/</g,'&lt;') + '\n';
+          }
+        }
+        display.innerHTML = diffHtml;
+      } else {
+        display.textContent = newJson;
+      }
+      prevSnapshot = newJson;
+        
+      // Simple brute-force view update (next chapter we'll use Diff + Patch)
+      const appEl = document.getElementById('app');
+      appEl.innerHTML = `
+        <div style="${vnode.props.style}">
+           <h1 style="${vnode.children[0].props.style}">${vnode.children[0].children[0]}</h1>
+           <p>${vnode.children[1].children[0]}</p>
+           <button id="inc-btn">${vnode.children[2].children[0]}</button>
+        </div>
+      `;
+      // Because innerHTML rebuilt the DOM, need to rebind events
+      document.getElementById('inc-btn').addEventListener('click', increment);
+    }
+
+    // Initialize
+    updateApp();
+  </script>
+</body>
+</html>

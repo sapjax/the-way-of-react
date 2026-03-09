@@ -1,7 +1,13 @@
 .vscode/
 *.epub
 *.pdf
-*.html
+*.py
 
-demo/
-review.md
+test_dir/
+
+secrets/
+*.key
+.env
+dist/
+build/
+node_modules/

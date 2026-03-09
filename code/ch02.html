@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 2 — Template Engine</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f9f9f9; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; background: white; }
+    .card h3 { margin-top: 0; }
+    button { padding: 6px 12px; cursor: pointer; margin: 4px; border-radius: 4px; border: 1px solid #ccc; background: #eee; }
+    li { padding: 8px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; list-style: none; }
+    li .task-content { display: flex; align-items: center; gap: 8px; }
+    li.done span { text-decoration: line-through; color: #999; }
+    li .delete-btn { background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    input[type="text"] { padding: 8px; width: 60%; border-radius: 4px; border: 1px solid #ccc; }
+    #stats { font-size: 14px; color: #666; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    const app = document.getElementById('app');
+    
+    // 1. State
+    const state = {
+      todos: [
+        { text: 'Learn JavaScript', done: true },
+        { text: 'Learn Templates', done: false }
+      ],
+      inputValue: ''
+    };
+
+    // 2. Simple template function
+    function renderApp() {
+      // No diff — generate full HTML string directly
+      const html = `
+        <div class="card">
+          <h3>My Todo List</h3>
+          <div>
+            <input type="text" id="todo-input" value="${state.inputValue}" placeholder="Add a task">
+            <button id="add-btn">Add</button>
+          </div>
+          <p id="stats">Total ${state.todos.length} items</p>
+          <ul id="todo-list" style="padding-left: 0; margin-bottom: 0;">
+            ${state.todos.map((todo, index) => `
+              <li class="${todo.done ? 'done' : ''}">
+                <div class="task-content">
+                  <input type="checkbox" class="toggle-btn" data-index="${index}" ${todo.done ? 'checked' : ''}>
+                  <span>${todo.text}</span>
+                </div>
+                <button class="delete-btn" data-index="${index}">×</button>
+              </li>
+            `).join('')}
+          </ul>
+          <p style="color:red; font-size:12px;">Tip: try typing in the input box and notice the focus loss</p>
+        </div>
+        <div class="card">
+          <p style="font-size:12px; margin-top: 0;">🔓 <strong>XSS Experiment</strong>: Type in the input below:<br>
+          <code>&lt;img src=x onerror=alert("Hacked!")&gt;</code><br>then click "Inject" and see what happens.</p>
+          <input type="text" id="xss-input" placeholder="Enter malicious HTML...">
+          <button id="inject-btn">Inject</button>
+        </div>
+      `;
+      
+      // 3. Destroy and rebuild: performance killer & experience killer
+      app.innerHTML = html;
+
+      // 4. After rebuilding the DOM, must rebind all events (pain point)
+      const inputEl = document.getElementById('todo-input');
+      if (inputEl) {
+        inputEl.addEventListener('input', (e) => {
+          state.inputValue = e.target.value; 
+          renderApp(); // re-render on every keystroke!
+        });
+      }
+
+      const addBtn = document.getElementById('add-btn');
+      if (addBtn) {
+        addBtn.addEventListener('click', () => {
+          if (!state.inputValue) return;
+          state.todos.push({ text: state.inputValue, done: false });
+          state.inputValue = '';
+          renderApp();
+        });
+      }
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const index = e.target.dataset.index;
+          state.todos.splice(index, 1);
+          renderApp();
+        });
+      });
+
+      document.querySelectorAll('.toggle-btn').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+          const index = e.target.dataset.index;
+          state.todos[index].done = !state.todos[index].done;
+          renderApp();
+        });
+      });
+
+      // XSS experiment event binding
+      const injectBtn = document.getElementById('inject-btn');
+      if (injectBtn) {
+        injectBtn.addEventListener('click', () => {
+          const xssInput = document.getElementById('xss-input');
+          if (!xssInput || !xssInput.value) return;
+          state.todos.push({ text: xssInput.value, done: false });
+          renderApp();
+        });
+      }
+    }
+
+    // Initial render
+    renderApp();
+  </script>
+</body>
+</html>

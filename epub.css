@@ -101,7 +101,7 @@ pre code {
   border-radius: 0;
 }
 
-/* --- Blockquotes (Student/Master dialogue emphasis, chapter goals) --- */
+/* --- Blockquotes (Po/Shifu dialogue emphasis, chapter goals) --- */
 blockquote {
   margin: 1em 0;
   margin-left: 0;
@@ -120,7 +120,7 @@ blockquote p:last-child {
   margin-bottom: 0;
 }
 
-/* --- Bold dialogue markers (Master/Student) --- */
+/* --- Bold dialogue markers (Shifu/Po) --- */
 strong {
   font-weight: bold;
 }

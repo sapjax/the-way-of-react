@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 9 — The Browser Freeze</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; text-align: center; }
+    .box { display: inline-block; width: 10px; height: 10px; margin: 1px; background: #0066cc; }
+    input { padding: 10px; font-size: 16px; width: 300px; margin: 20px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    #status { color: #ff4444; font-weight: bold; margin: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Browser Freeze Demo</h1>
+  <p>1. Try typing steadily in the input box below to feel how smooth it is.</p>
+  <p>2. Click the "Trigger 10k Node Render" button.</p>
+  <p>3. <strong>Before the render finishes</strong> (when the page freezes), immediately go back to the input box and type frantically.</p>
+  
+  <input type="text" placeholder="Try typing here...">
+  <br>
+  <button id="render-btn">Trigger 10k Node Render</button>
+  <div id="status"></div>
+  <div id="app"></div>
+
+  <script>
+    // Simulate the recursive rendering of the Stack Reconciler
+    function renderTree(depth) {
+      if (depth === 0) {
+        const el = document.createElement('div');
+        el.className = 'box';
+        // Simulate some CPU-consuming component logic
+        let sum = 0;
+        for (let i = 0; i < 50000; i++) sum += Math.random();
+        return el;
+      }
+      
+      const container = document.createElement('div');
+      // Two branches per level, exponential growth
+      container.appendChild(renderTree(depth - 1));
+      container.appendChild(renderTree(depth - 1));
+      return container;
+    }
+
+    document.getElementById('render-btn').addEventListener('click', () => {
+      const app = document.getElementById('app');
+      const status = document.getElementById('status');
+      
+      status.textContent = 'Rendering... The page is frozen, try typing quickly!';
+      
+      // Use setTimeout to allow the status text above to render first, then lock the main thread
+      setTimeout(() => {
+        const start = performance.now();
+        
+        // Generate a tree of depth 13, totally 8192 nodes, with time-consuming calculations
+        const tree = renderTree(13);
+        
+        app.innerHTML = '';
+        app.appendChild(tree);
+        
+        const time = (performance.now() - start).toFixed(0);
+        status.textContent = `Done in ${time} ms. (The keys you pressed just popped up now!)`;
+      }, 50);
+    });
+  </script>
+</body>
+</html>

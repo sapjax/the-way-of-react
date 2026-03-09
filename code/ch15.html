@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 15 — Concurrent, Suspense, SSR & RSC</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 700px; margin: 0 auto; background: #fafafa; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; background: #fff; }
+    .card h3 { margin-top: 0; }
+    button { padding: 8px 16px; cursor: pointer; margin: 4px; border-radius: 4px; border: 1px solid #ccc; background: #eee; }
+    .user-card { background: #f0f8ff; padding: 10px; border-radius: 4px; margin-top: 10px; border-left: 4px solid #0066cc; }
+    pre { background: #f5f5f5; padding: 12px; border-radius: 6px; font-size: 13px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; }
+    .html-output { background: #e8f5e9; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px dashed #4caf50; }
+    .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .rsc-server { background: #fff3e0; border-left: 4px solid #ff9800; padding: 10px; margin: 8px 0; border-radius: 0 6px 6px 0; }
+    .rsc-client { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 10px; margin: 8px 0; border-radius: 0 6px 6px 0; }
+    .arrow { text-align: center; font-size: 24px; color: #999; margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>Chapter 15 — The Ultimate React Architecture</h1>
+  
+  <!-- Demo 1: Suspense on Fiber Engine -->
+  <div class="card">
+    <h3>1. Suspense: throw Promise pattern</h3>
+    <p>Click the button to simulate data loading. In the Fiber engine, if a component throws a Promise,
+       the current tree's rendering is suspended and switches to fallback UI.
+       After data resolves, Fiber automatically re-renders.</p>
+    <button id="btn-suspense">🔄 Load user data (Suspense)</button>
+    <div id="suspense-root" style="margin-top: 10px; min-height: 80px;">
+      <p style="color: #999; font-style: italic;">Click the button above to experience Fiber suspension...</p>
+    </div>
+  </div>
+
+  <!-- Demo 2: renderToString (SSR) -->
+  <div class="card">
+    <h3>2. renderToString: SSR simulation</h3>
+    <p>Click the button and watch how VNodes are converted to HTML strings (the core of SSR).
+       Event listeners are deliberately skipped (waiting for Hydration to fix them).</p>
+    <button id="btn-ssr">🖥️ Run renderToString</button>
+    <div id="ssr-root"></div>
+  </div>
+
+  <!-- Demo 3: RSC Payload -->
+  <div class="card">
+    <h3>3. RSC Payload: Server Component simulation</h3>
+    <p>Simulates the RSC core flow: Server Component renders on server → generates clean RSC Payload JSON
+       → client receives and awakens Client Component.</p>
+    <button id="btn-rsc">🚀 Simulate RSC flow</button>
+    <div id="rsc-root"></div>
+  </div>
+
+  <script>
+    // ============================================
+    // 1. Engine: Mini-React (Fiber + Suspense)
+    // ============================================
+    function h(type, props, ...children) {
+      return {
+        type,
+        props: {
+          ...props,
+          children: children.flat().map(child =>
+            typeof child === "object" ? child : { type: "TEXT_ELEMENT", props: { nodeValue: child, children: [] } }
+          )
+        }
+      };
+    }
+
+    let workInProgress = null, currentRoot = null, wipRoot = null, deletions = null, wipFiber = null, hookIndex = null;
+
+    function render(element, container) {
+      wipRoot = { dom: container, props: { children: [element] }, alternate: currentRoot };
+      deletions = [];
+      workInProgress = wipRoot;
+    }
+
+    function workLoop(deadline) {
+      let shouldYield = false;
+      while (workInProgress && !shouldYield) {
+        workInProgress = performUnitOfWork(workInProgress);
+        shouldYield = deadline.timeRemaining() < 1;
+      }
+      if (!workInProgress && wipRoot) commitRoot();
+      requestIdleCallback(workLoop);
+    }
+    requestIdleCallback(workLoop);
+
+    function performUnitOfWork(fiber) {
+      const isFunctionComponent = fiber.type instanceof Function;
+      if (isFunctionComponent) {
+        updateFunctionComponent(fiber);
+      } else {
+        if (!fiber.dom) fiber.dom = createDom(fiber);
+        reconcileChildren(fiber, fiber.props.children);
+      }
+      if (fiber.child) return fiber.child;
+      let nextFiber = fiber;
+      while (nextFiber) {
+        if (nextFiber.sibling) return nextFiber.sibling;
+        nextFiber = nextFiber.return;
+      }
+      return null;
+    }
+
+    function updateFunctionComponent(fiber) {
+      wipFiber = fiber;
+      hookIndex = 0;
+      wipFiber.hooks = [];
+      
+      try {
+        const children = [fiber.type(fiber.props)].flat();
+        reconcileChildren(fiber, children);
+      } catch (e) {
+        if (e instanceof Promise) {
+          const fallbackMsg = fiber.props.fallback || '⏳ Loading...';
+          reconcileChildren(fiber, [h('span', { style: 'color:#999' }, fallbackMsg)]);
+          e.then(() => {
+            wipRoot = { dom: currentRoot.dom, props: currentRoot.props, alternate: currentRoot };
+            deletions = [];
+            workInProgress = wipRoot;
+          });
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    function useState(initial) {
+      const oldHook = wipFiber.alternate && wipFiber.alternate.hooks && wipFiber.alternate.hooks[hookIndex];
+      const hook = { 
+        state: oldHook ? oldHook.state : initial, 
+        queue: oldHook ? oldHook.queue : [],
+        setState: oldHook ? oldHook.setState : null
+      };
+      hook.queue.forEach(action => hook.state = typeof action === 'function' ? action(hook.state) : action);
+      hook.queue.length = 0;
+      if (!hook.setState) {
+        hook.setState = action => {
+          hook.queue.push(action);
+          wipRoot = { dom: currentRoot.dom, props: currentRoot.props, alternate: currentRoot };
+          workInProgress = wipRoot;
+          deletions = [];
+        };
+      }
+      wipFiber.hooks.push(hook);
+      hookIndex++;
+      return [hook.state, hook.setState];
+    }
+
+    function createDom(fiber) {
+      const dom = fiber.type === "TEXT_ELEMENT" ? document.createTextNode("") : document.createElement(fiber.type);
+      updateDom(dom, {}, fiber.props);
+      return dom;
+    }
+
+    function updateDom(dom, prevProps, nextProps) {
+      for (const k in prevProps) {
+        if (k !== 'children') {
+          if (!(k in nextProps) || prevProps[k] !== nextProps[k]) {
+            if (k.startsWith('on')) dom.removeEventListener(k.slice(2).toLowerCase(), prevProps[k]);
+            else if (!(k in nextProps)) {
+              if (k === 'className') dom.removeAttribute('class');
+              else if (k === 'style') dom.style.cssText = '';
+              else dom[k] = '';
+            }
+          }
+        }
+      }
+      for (const k in nextProps) {
+        if (k !== 'children' && prevProps[k] !== nextProps[k]) {
+          if (k.startsWith('on')) dom.addEventListener(k.slice(2).toLowerCase(), nextProps[k]);
+          else {
+            if (k === 'className') dom.setAttribute('class', nextProps[k]);
+            else if (k === 'style' && typeof nextProps[k] === 'string') dom.style.cssText = nextProps[k];
+            else dom[k] = nextProps[k];
+          }
+        }
+      }
+    }
+
+    function reconcileChildren(wipFiber, elements) {
+      let index = 0, oldFiber = wipFiber.alternate && wipFiber.alternate.child, prevSibling = null;
+      while (index < elements.length || oldFiber != null) {
+        const element = elements[index];
+        let newFiber = null;
+        const sameType = oldFiber && element && element.type === oldFiber.type;
+        if (sameType) newFiber = { type: oldFiber.type, props: element.props, dom: oldFiber.dom, return: wipFiber, alternate: oldFiber, effectTag: "UPDATE" };
+        if (element && !sameType) newFiber = { type: element.type, props: element.props, dom: null, return: wipFiber, alternate: null, effectTag: "PLACEMENT" };
+        if (oldFiber && !sameType) { oldFiber.effectTag = "DELETION"; deletions.push(oldFiber); }
+        if (oldFiber) oldFiber = oldFiber.sibling;
+        if (index === 0) wipFiber.child = newFiber;
+        else if (element) prevSibling.sibling = newFiber;
+        prevSibling = newFiber;
+        index++;
+      }
+    }
+
+    function commitRoot() {
+      deletions.forEach(commitWork);
+      commitWork(wipRoot.child);
+      currentRoot = wipRoot;
+      wipRoot = null;
+    }
+
+    function commitWork(fiber) {
+      if (!fiber) return;
+      let domParentFiber = fiber.return;
+      while (!domParentFiber.dom) domParentFiber = domParentFiber.return;
+      const domParent = domParentFiber.dom;
+      if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) domParent.appendChild(fiber.dom);
+      else if (fiber.effectTag === "UPDATE" && fiber.dom != null) updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+      else if (fiber.effectTag === "DELETION") { commitDeletion(fiber, domParent); return; }
+      commitWork(fiber.child);
+      commitWork(fiber.sibling);
+    }
+    
+    function commitDeletion(fiber, domParent) {
+      if (fiber.dom) domParent.removeChild(fiber.dom);
+      else commitDeletion(fiber.child, domParent);
+    }
+
+    // ============================================
+    // 2. Demo: Suspense
+    // ============================================
+    function createResource(fetchFn) {
+      let status = 'pending';
+      let result;
+      let promise = fetchFn().then(
+        data => { status = 'success'; result = data; },
+        err => { status = 'error'; result = err; }
+      );
+      return {
+        read() {
+          if (status === 'pending') throw promise;
+          if (status === 'error') throw result;
+          return result;
+        }
+      };
+    }
+
+    let userResource = null;
+
+    function UserProfile() {
+      const user = userResource.read();
+      return h('div', { className: 'user-card' },
+        h('strong', null, user.name),
+        h('p', null, 'Role: ' + user.role),
+        h('p', null, 'Level: ' + user.level),
+        h('em', { style: 'color: green' }, '✅ Data loaded, Fiber resumed rendering!')
+      );
+    }
+
+    function SuspenseApp() {
+      const [started, setStarted] = useState(false);
+      
+      window.triggerSuspense = () => {
+        userResource = createResource(() => 
+          new Promise(resolve => 
+            setTimeout(() => resolve({ name: 'Po, the Dragon Warrior', role: 'React Explorer', level: 99 }), 1500)
+          )
+        );
+        setStarted(true);
+      };
+
+      if (!started) return h('p', { style: 'color: #999; font-style: italic;' }, 'Click the button above to experience Fiber suspension with fallback...');
+      return h(UserProfile, { fallback: '⏳ Fetching user data from server... (Fiber execution suspended)' });
+    }
+
+    render(h(SuspenseApp, null), document.getElementById('suspense-root'));
+
+    document.getElementById('btn-suspense').addEventListener('click', () => {
+      if (window.triggerSuspense) window.triggerSuspense();
+    });
+
+    // ============================================
+    // 3. Demo: renderToString (SSR simulation)
+    // ============================================
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function renderToString(vnode) {
+      if (typeof vnode === 'string' || typeof vnode === 'number') return escapeHtml(String(vnode));
+      if (vnode.type === 'TEXT_ELEMENT') return escapeHtml(String(vnode.props.nodeValue));
+      let html = '<' + vnode.type;
+      for (const key in vnode.props) {
+        if (key === 'children') continue;
+        if (key.startsWith('on')) continue;
+        html += ' ' + key + '="' + escapeHtml(vnode.props[key]) + '"';
+      }
+      html += '>';
+      const children = vnode.props.children || [];
+      for (const child of children) html += renderToString(child);
+      html += '</' + vnode.type + '>';
+      return html;
+    }
+
+    const ssrRoot = document.getElementById('ssr-root');
+    document.getElementById('btn-ssr').addEventListener('click', () => {
+      ssrRoot.innerHTML = '';
+      const vnode = h('div', { className: 'card' },
+        h('h2', null, 'SSR-rendered list'),
+        h('ul', null,
+          h('li', null, 'Learn React'),
+          h('li', null, 'Understand SSR')
+        ),
+        h('button', { onclick: () => alert('This button has no Hydration yet — clicking does nothing!') }, 'Inactive button (needs Hydration)')
+      );
+
+      const htmlString = renderToString(vnode);
+      ssrRoot.innerHTML += `<p class="label">① VNode data structure</p><pre>${JSON.stringify(vnode, null, 2)}</pre>`;
+      ssrRoot.innerHTML += `<p class="label">② renderToString pure string output</p><pre>${escapeHtml(htmlString.replace(/></g, '>\n<'))}</pre>`;
+      ssrRoot.innerHTML += `<p class="label">③ Browser renders HTML (button inactive because onclick was stripped)</p><div class="html-output">${htmlString}</div>`;
+    });
+
+    // ============================================
+    // 4. Demo: RSC Payload (Server Component simulation)
+    // ============================================
+    const rscRoot = document.getElementById('rsc-root');
+
+    // Server Component: runs on "server," never sent to client
+    function BlogPage(props) {
+      const post = { title: 'Understanding RSC', content: 'RSC generates a JSON Payload instead of raw HTML. The client only needs to Hydrate the Client Component parts...', author: 'Shifu' };
+      return h('article', null,
+        h('h2', null, post.title),
+        h('p', null, post.content),
+        h('p', { style: 'color: #666; font-size: 13px;' }, 'Author: ' + post.author),
+        { $$typeof: 'client-reference', module: 'LikeButton', props: { postId: props.id } }
+      );
+    }
+
+    function serverRender(componentFn, props) {
+      return resolveToPayload(componentFn(props));
+    }
+
+    function resolveToPayload(node) {
+      if (typeof node === 'string' || typeof node === 'number') return node;
+      if (node.$$typeof === 'client-reference') return node;
+      return {
+        type: node.type,
+        props: Object.keys(node.props).reduce((acc, k) => {
+          if (k !== 'children') acc[k] = node.props[k];
+          return acc;
+        }, {}),
+        children: (node.props.children || []).map(c => resolveToPayload(c))
+      };
+    }
+
+    function payloadToVNode(node, registry) {
+      if (typeof node === 'string' || typeof node === 'number') return node;
+      if (node.$$typeof === 'client-reference') {
+        const fn = registry[node.module];
+        return fn(node.props);
+      }
+      return h(node.type, node.props, ...node.children.map(c => payloadToVNode(c, registry)));
+    }
+
+    function LikeButton(props) {
+      const [count, setCount] = useState(0);
+      return h('button', { 
+        style: 'background:#ff6b6b;color:white;border:none;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:14px;',
+        onclick: () => setCount(count + 1)
+      }, `❤️ Like (${count})`);
+    }
+
+    const clientRegistry = { 'LikeButton': LikeButton };
+    let _rscRendered = false;
+
+    document.getElementById('btn-rsc').addEventListener('click', () => {
+      if (_rscRendered) return;
+      _rscRendered = true;
+      rscRoot.innerHTML = '';
+
+      const rscServerDiv = document.createElement('div');
+      rscServerDiv.className = 'rsc-server';
+      rscServerDiv.innerHTML = '<strong>🖥️ Remote Server</strong>: executes BlogPage, generates RSC Payload (pure JSON, BlogPage function code not included)';
+      rscRoot.appendChild(rscServerDiv);
+
+      const payload = serverRender(BlogPage, { id: 42 });
+      
+      const pLabel1 = document.createElement('p');
+      pLabel1.className = 'label';
+      pLabel1.innerText = 'RSC Payload (network transport format: pure JSON, BlogPage function never sent to browser)';
+      rscRoot.appendChild(pLabel1);
+
+      const pre1 = document.createElement('pre');
+      pre1.innerText = JSON.stringify(payload, null, 2);
+      rscRoot.appendChild(pre1);
+      
+      const arrowDiv = document.createElement('div');
+      arrowDiv.className = 'arrow';
+      arrowDiv.innerText = '⬇️ Network transfer (pure JSON, zero JS)';
+      rscRoot.appendChild(arrowDiv);
+
+      const rscClientDiv = document.createElement('div');
+      rscClientDiv.className = 'rsc-client';
+      rscClientDiv.innerHTML = '<strong>🌐 Local Client</strong>: receives Payload, finds client-reference, loads LikeButton Client Component, hands to Fiber for rendering';
+      rscRoot.appendChild(rscClientDiv);
+      
+      const wrapper = document.createElement('div');
+      wrapper.className = 'html-output';
+      rscRoot.appendChild(wrapper);
+      
+      function PayloadRenderer() {
+        return payloadToVNode(payload, clientRegistry);
+      }
+      render(h(PayloadRenderer, null), wrapper);
+    });
+  </script>
+</body>
+</html>
