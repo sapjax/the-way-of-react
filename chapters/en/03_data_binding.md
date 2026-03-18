@@ -90,7 +90,6 @@ const todoModel = new Model({
     { id: 2, text: 'Learn Templates', done: false }
   ],
   inputValue: '',
-  filter: 'all' // added filter state
 });
 
 // === View ===
@@ -112,24 +111,16 @@ document.getElementById('add-btn').addEventListener('click', () => {
   todoModel.set('inputValue', '');
 });
 
-// Listen for filter button clicks, update Model
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    todoModel.set('filter', e.target.dataset.filter);
-  });
-});
-
 // === Binding: Model → View ===
-// When list or filter changes, fully update the list area
+// When the list changes, fully update the list area
 todoModel.on('change:todos', () => renderFullList());
-todoModel.on('change:filter', () => renderFullList());
 
 // When input value changes, [precisely update] the input box
 todoModel.on('change:inputValue', (v) => {
   inputEl.value = v;                      
 });
 
-// Initialize
+// We omit the renderFullList function that creates DOM details and focus on the binding relationship.
 renderFullList();
 ```
 
@@ -283,7 +274,7 @@ Save the following code as `ch03.html` to experience how Observer-pattern data b
       <input type="text" id="todo-input" placeholder="Add a task">
       <button id="add-btn">Add</button>
     </div>
-    
+
     <div class="filters" id="filters">
       <button data-filter="all" class="filter-btn active">All</button>
       <button data-filter="active" class="filter-btn">Active</button>

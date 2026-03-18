@@ -94,16 +94,12 @@ const todoModel = new Model({
     { id: 2, text: 'Learn Templates', done: false }
   ],
   inputValue: '',
-  filter: 'all' // 新增了过滤状态
 });
 
 // === View ===
 const listEl = document.getElementById('todo-list');
 const inputEl = document.getElementById('todo-input');
 const statsEl = document.getElementById('stats');
-
-// 我们略去创建 DOM 细节的 renderTodo 函数，重点看绑定关系。
-// 每当触发 DOM 事件时，我们只负责更新 Model。
 
 // === Binding: View → Model ===
 inputEl.addEventListener('input', (e) => {
@@ -119,26 +115,18 @@ document.getElementById('add-btn').addEventListener('click', () => {
   todoModel.set('inputValue', '');
 });
 
-// 监听 filter 按钮点击，更新 Model
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    todoModel.set('filter', e.target.dataset.filter);
-  });
-});
-
 // === Binding: Model → View ===
 // Model 变化时，触发视图更新
 
-// 当改变列表或过滤条件时，全量更新列表区域
+// 当改变列表时，全量更新列表区域
 todoModel.on('change:todos', () => renderFullList());
-todoModel.on('change:filter', () => renderFullList());
 
 // 当改变输入值时，【精准更新】输入框
 todoModel.on('change:inputValue', (v) => {
   inputEl.value = v;                      
 });
 
-// 初始化
+// 我们略去创建 DOM 细节的 renderFullList 函数，重点看绑定关系。
 renderFullList();
 ```
 
