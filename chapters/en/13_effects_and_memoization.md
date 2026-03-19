@@ -1,6 +1,6 @@
 # Chapter 13: Effects and Memoization — Bringing Order to Time
 
-![figure 13.1](../images/ch13_effects.png)
+![figure 13.1](../../website/public/images/ch13_effects.png)
 
 Po stared at the completed `useState` implementation, Shifu's last words still echoing: *"Everything inside a function re-executes from scratch every time state changes."*
 

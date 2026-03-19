@@ -1,6 +1,6 @@
 # Chapter 8: Patterns of Reuse
 
-![figure 8.1](../images/ch08_reuse.png)
+![figure 8.1](../../website/public/images/ch08_reuse.png)
 
 ## 8.1 The Need for Reuse
 

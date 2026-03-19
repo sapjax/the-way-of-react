@@ -1,6 +1,6 @@
 # Chapter 11: Reconciliation & Commit — Filling in the Engine's Blueprint
 
-![figure 11.1](../images/ch11_reconciliation.png)
+![figure 11.1](../../website/public/images/ch11_reconciliation.png)
 
 ## 11.1 Standardizing the Node Format (Refactoring the h function)
 

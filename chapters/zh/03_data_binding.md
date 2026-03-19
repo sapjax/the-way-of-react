@@ -1,6 +1,6 @@
 # 第三章：数据绑定的黎明 (The Dawn of Data Binding)
 
-![figure 3.1](../images/ch03_data_binding.png)
+![figure 3.1](../../website/public/images/ch03_data_binding.png)
 
 ## 3.1 寻找平衡
 

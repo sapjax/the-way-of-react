@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="cover.png" width="500" alt="The Way of React Cover" />
+  <img src="website/public/images/cover.png" width="500" alt="The Way of React Cover" />
 
   # 《The Way of React》——从零开始亲手实现 React 
   

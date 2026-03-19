@@ -1,6 +1,6 @@
 # 第八章：复用的困境 (Patterns of Reuse)
 
-![figure 8.1](../images/ch08_reuse.png)
+![figure 8.1](../../website/public/images/ch08_reuse.png)
 
 ## 8.1 复用的需求
 

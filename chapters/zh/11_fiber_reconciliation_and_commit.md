@@ -1,6 +1,6 @@
 # 第十一章：协调与提交 —— 填充引擎的蓝图 (Fiber Reconciliation & Commit)
 
-![figure 11.1](../images/ch11_reconciliation.png)
+![figure 11.1](../../website/public/images/ch11_reconciliation.png)
 
 ## 11.1 统一节点格式 (改造 h 函数)
 

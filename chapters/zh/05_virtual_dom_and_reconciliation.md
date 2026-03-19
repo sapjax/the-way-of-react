@@ -1,6 +1,6 @@
 # 第五章：虚拟 DOM 与协调 (Virtual DOM & Reconciliation)
 
-![figure 5.1](../images/ch05_virtual_dom.png)
+![figure 5.1](../../website/public/images/ch05_virtual_dom.png)
 
 ## 5.1 全局心智模型
 
@@ -159,7 +159,7 @@ function mount(vnode, container) {
 
 下面这张流程图展示了 `patch` 的核心决策过程：
 
-![figure 5.4](../images/figure_5_4.png)
+![figure 5.4](../../website/public/images/figure_5_4.png)
 
 ### 第一步：节点类型改变
 

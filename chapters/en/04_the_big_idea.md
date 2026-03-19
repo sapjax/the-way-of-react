@@ -1,6 +1,6 @@
 # Chapter 4: The Big Idea — UI as a Function of State
 
-![figure 4.1](../images/ch04_big_idea.png)
+![figure 4.1](../../website/public/images/ch04_big_idea.png)
 
 ## 4.1 The Desire for Simplicity
 

@@ -1,6 +1,6 @@
 # 第九章：浏览器停摆 —— 性能危机的爆发 (The Browser Freeze)
 
-![figure 9.1](../images/ch09_browser_freeze.png)
+![figure 9.1](../../website/public/images/ch09_browser_freeze.png)
 
 ## 9.1 栈的无底洞
 

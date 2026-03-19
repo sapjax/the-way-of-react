@@ -1,6 +1,6 @@
 # 第十三章：副作用与护城河 —— 重构时间的秩序 (Effects and Memoization)
 
-![figure 13.1](../images/ch13_effects.png)
+![figure 13.1](../../website/public/images/ch13_effects.png)
 
 Po 盯着上一章写好的 `useState` 实现，脑子里还回响着 Shifu 最后那句话——*"函数里的一切，都会在每次状态变化时从头执行一遍。"*
 

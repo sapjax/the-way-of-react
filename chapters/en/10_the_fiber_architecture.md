@@ -1,6 +1,6 @@
 # Chapter 10: The Fiber Architecture — Building a Brand New Mental Model
 
-![figure 10.1](../images/ch10_fiber.png)
+![figure 10.1](../../website/public/images/ch10_fiber.png)
 
 ## 10.1 The Main Thread Crisis
 
@@ -43,7 +43,7 @@ Here, we relied on the JavaScript engine's "call stack" to remember where we wer
 1. **Render Phase**: Gradually build the tree in memory and collect all changes. This phase can be interrupted.
 2. **Commit Phase**: Once the Render Phase is complete, sync all collected changes to the real DOM in one breath. This phase is uninterruptible.
 
-![figure 10.2](../images/figure_10_2.png)
+![figure 10.2](../../website/public/images/figure_10_2.png)
 
 ## 10.3 Double Buffering: The Draft and The Blueprint
 
@@ -102,7 +102,7 @@ This new node data structure with three navigation pointers is a **Fiber**. Imag
 
 If we convert it into a Fiber structure, it’s no longer just a tree, but a network connected by pointers (a linked list):
 
-![figure 10.4](../images/figure_10_4.png)
+![figure 10.4](../../website/public/images/figure_10_4.png)
 
 **🐼**: Every node is connected by lines. With these three pointers, even if we pause at any moment, we always know "where to go next."
 

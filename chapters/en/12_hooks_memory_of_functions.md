@@ -1,6 +1,6 @@
 # Chapter 12: Hooks — The Memory of Functions
 
-![figure 12.1](../images/ch12_hooks.png)
+![figure 12.1](../../website/public/images/ch12_hooks.png)
 
 ## 12.1 Leaving the Old Baggage Behind
 

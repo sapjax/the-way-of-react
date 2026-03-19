@@ -1,6 +1,6 @@
 # Chapter 1: The Raw DOM — Where Everything Begins
 
-![figure 1.1](../images/ch01_raw_dom.png)
+![figure 1.1](../../website/public/images/ch01_raw_dom.png)
 
 ## 1.1 Starting From Zero
 

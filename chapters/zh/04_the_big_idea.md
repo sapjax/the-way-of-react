@@ -1,6 +1,6 @@
 # 第四章：伟大的构想 —— UI 即状态的函数 (The Big Idea)
 
-![figure 4.1](../images/ch04_big_idea.png)
+![figure 4.1](../../website/public/images/ch04_big_idea.png)
 
 ## 4.1 简化的渴望
 

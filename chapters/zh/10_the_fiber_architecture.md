@@ -1,6 +1,6 @@
 # 第十章：Fiber 架构 —— 建立全新的心智模型 (The Fiber Architecture: Mental Model)
 
-![figure 10.1](../images/ch10_fiber.png)
+![figure 10.1](../../website/public/images/ch10_fiber.png)
 
 ## 10.1 主线程的危机
 
@@ -43,7 +43,7 @@ for (let i = 0; i < children.length; i++) {
 1. **Render Phase（渲染阶段）**：在内存中逐步构建树，收集所有的改动。这个阶段可以被打断。
 2. **Commit Phase（提交阶段）**：一旦 Render 阶段完成，一口气将所有收集到的改动同步到真实的 DOM 上。这个阶段不可中断。
 
-![figure 10.2](../images/figure_10_2.png)
+![figure 10.2](../../website/public/images/figure_10_2.png)
 
 ## 10.3 双缓冲：草稿与蓝图
 
@@ -102,7 +102,7 @@ for (let i = 0; i < children.length; i++) {
 
 如果我们把它转换成 Fiber 结构，它不再是一棵树，而是一张通过指针连结的网络（单向链表）：
 
-![figure 10.4](../images/figure_10_4.png)
+![figure 10.4](../../website/public/images/figure_10_4.png)
 
 **🐼**：每个节点都通过线连在一起了。有了这三个指针，就算在某个瞬间暂停，也永远知道“下一步该去哪”。
 

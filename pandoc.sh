@@ -15,7 +15,7 @@
 set -euo pipefail
 
 # --- Config ---
-COVER_IMAGE="cover.png"
+COVER_IMAGE="website/public/images/cover.png"
 CSS_FILE="epub.css"
 
 echo "🚀 Building EPUBs for all languages..."

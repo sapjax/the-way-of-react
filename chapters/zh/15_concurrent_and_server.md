@@ -1,6 +1,6 @@
 # 第十五章：从并发到服务器 —— React 的终极形态 (Concurrent & Server Components)
 
-![figure 15.1](../images/ch15_concurrent_and_server.png)
+![figure 15.1](../../website/public/images/ch15_concurrent_and_server.png)
 
 ## 15.1 最后一块拼图
 

@@ -1,0 +1,7 @@
+secrets/
+*.key
+.env
+dist/
+build/
+node_modules/
+.next

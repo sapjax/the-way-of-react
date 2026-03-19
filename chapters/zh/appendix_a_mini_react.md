@@ -1,6 +1,6 @@
 # 附录 A：Mini-React vs React —— 我们简化了什么
 
-![figure A.1](../images/ch_appendix.png)
+![figure A.1](../../website/public/images/ch_appendix.png)
 
 在这本书中，我们从最初的同步递归构建（Stack Reconciler），一步步将引擎拉扯、进化到了一个约 **400 行** 的现代化 Fiber 和 Hooks 引擎。它涵盖了 Virtual DOM、时间切片（Time Slicing）、Fiber 协调（Reconciliation）、同步提交（Commit）以及核心 Hooks。
 

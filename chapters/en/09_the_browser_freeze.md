@@ -1,6 +1,6 @@
 # Chapter 9: The Browser Freeze
 
-![figure 9.1](../images/ch09_browser_freeze.png)
+![figure 9.1](../../website/public/images/ch09_browser_freeze.png)
 
 ## 9.1 The Bottomless Pit of the Stack
 

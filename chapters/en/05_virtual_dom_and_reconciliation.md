@@ -1,6 +1,6 @@
 # Chapter 5: Virtual DOM & Reconciliation
 
-![figure 5.1](../images/ch05_virtual_dom.png)
+![figure 5.1](../../website/public/images/ch05_virtual_dom.png)
 
 ## 5.1 The Global Mental Model
 
@@ -159,7 +159,7 @@ function mount(vnode, container) {
 
 This flowchart shows the core decision process of `patch`:
 
-![figure 5.4](../images/figure_5_4.png)
+![figure 5.4](../../website/public/images/figure_5_4.png)
 
 ### Step 1: Node Type Changes
 

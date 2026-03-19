@@ -1,6 +1,6 @@
 # Chapter 6: Components & Composition
 
-![figure 6.1](../images/ch06_components.png)
+![figure 6.1](../../website/public/images/ch06_components.png)
 
 ## 6.1 Splitting the Giant `render`
 
@@ -59,7 +59,7 @@ class Component {
 
 **🐼**: With this base class, we can write UI components by inheriting from it. Since the essence of a class is a function, when we pass a component class into `h()`, the type of `vnode.tag` will become `'function'`. The engine can use this to distinguish between regular HTML nodes and component nodes.
 
-![figure 6.2](../images/figure_6_2.png)
+![figure 6.2](../../website/public/images/figure_6_2.png)
 
 ### Upgrading `mount`
 
@@ -143,7 +143,7 @@ class Component {
   }
 ```
 
-![figure 6.3](../images/figure_6_3.png)
+![figure 6.3](../../website/public/images/figure_6_3.png)
 
 ## 6.4 Props: The Bridge Between Components
 

@@ -1,6 +1,6 @@
 # 第十二章：Hooks —— 函数的记忆 (The Memory of Functions)
 
-![figure 12.1](../images/ch12_hooks.png)
+![figure 12.1](../../website/public/images/ch12_hooks.png)
 
 ## 12.1 抛弃历史包袱
 

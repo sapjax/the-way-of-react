@@ -1,6 +1,6 @@
 # Chapter 15: From Concurrent to Server — React's Ultimate Form
 
-![figure 15.1](../images/ch15_concurrent_and_server.png)
+![figure 15.1](../../website/public/images/ch15_concurrent_and_server.png)
 
 ## 15.1 The Last Piece
 

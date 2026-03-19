@@ -1,6 +1,6 @@
 # 第一章：原生 DOM —— 一切的起点 (The Raw DOM)
 
-![figure 1.1](../images/ch01_raw_dom.png)
+![figure 1.1](../../website/public/images/ch01_raw_dom.png)
 
 ## 1.1 从零开始的挑战
 

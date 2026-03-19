@@ -1,6 +1,6 @@
 # 第六章：组件与组合 (Components & Composition)
 
-![figure 6.1](../images/ch06_components.png)
+![figure 6.1](../../website/public/images/ch06_components.png)
 
 ## 6.1 拆分巨大的 `render`
 
@@ -59,7 +59,7 @@ class Component {
 
 **🐼**：有了这个基础类，就可以通过继承它来编写 UI 组件。由于类的本质是函数，所以当我们在 `h()` 里传入一个组件类时，`vnode.tag` 的类型就会变成 `'function'`。引擎就可以通过这一点区分普通 HTML 节点和组件节点。
 
-![figure 6.2](../images/figure_6_2.png)
+![figure 6.2](../../website/public/images/figure_6_2.png)
 
 ### 升级 `mount`
 
@@ -143,7 +143,7 @@ class Component {
   }
 ```
 
-![figure 6.3](../images/figure_6_3.png)
+![figure 6.3](../../website/public/images/figure_6_3.png)
 
 ## 6.4 Props：组件之间的桥梁
 

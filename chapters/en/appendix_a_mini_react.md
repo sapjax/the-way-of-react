@@ -1,6 +1,6 @@
 # Appendix A: Mini-React vs React — What We Simplified
 
-![figure A.1](../images/ch_appendix.png)
+![figure A.1](../../website/public/images/ch_appendix.png)
 
 In this book, we started from the initial synchronous recursive build (Stack Reconciler) and incrementally evolved the engine into a modern Fiber and Hooks engine of about **400 lines**. It covers Virtual DOM, Time Slicing, Fiber Reconciliation, synchronous Commit, and the core Hooks.
 

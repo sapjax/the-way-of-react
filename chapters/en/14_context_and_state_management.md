@@ -1,6 +1,6 @@
 # Chapter 14: State Management and the Cross-Layer Bridge
 
-![figure 14.1](../images/ch14_context_and_state.png)
+![figure 14.1](../../website/public/images/ch14_context_and_state.png)
 
 Po built a larger Todo app with the Hooks from previous chapters. `useState` managed local state, `useEffect` handled side effects, `useMemo` optimized expensive computations. But soon he hit a new problem that none of the four tools could solve.
 

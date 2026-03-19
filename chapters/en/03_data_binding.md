@@ -1,6 +1,6 @@
 # Chapter 3: The Dawn of Data Binding
 
-![figure 3.1](../images/ch03_data_binding.png)
+![figure 3.1](../../website/public/images/ch03_data_binding.png)
 
 ## 3.1 Seeking Balance
 

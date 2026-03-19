@@ -1,6 +1,6 @@
 # 第十四章：状态管理与跨越层级的桥梁 (Context and State)
 
-![figure 14.1](../images/ch14_context_and_state.png)
+![figure 14.1](../../website/public/images/ch14_context_and_state.png)
 
 Po 用前几章学到的 Hooks 构建了一个较大的 Todo 应用。`useState` 管理局部状态，`useEffect` 处理副作用，`useMemo` 优化昂贵计算。但很快，他碰到了一个四件法宝都无法解决的新问题。
 

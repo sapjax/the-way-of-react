@@ -1,6 +1,6 @@
 # 第七章：类组件与生命周期 (Class Components & Lifecycle)
 
-![figure 7.1](../images/ch07_lifecycle.png)
+![figure 7.1](../../website/public/images/ch07_lifecycle.png)
 
 ## 7.1 给组件赋予记忆
 

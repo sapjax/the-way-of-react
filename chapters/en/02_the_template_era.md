@@ -1,6 +1,6 @@
 # Chapter 2: The Template Era — UI as a String
 
-![figure 2.1](../images/ch02_template.png)
+![figure 2.1](../../website/public/images/ch02_template.png)
 
 ## 2.1 Describe, Don't Instruct
 

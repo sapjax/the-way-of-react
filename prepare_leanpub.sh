@@ -19,7 +19,7 @@ for file in "$SOURCE_DIR"/*.md; do
     # 1. ../images -> images
     # 2. 🧙‍♂️ -> 🐢
     # Note: We use a multi-byte character for the wizard to ensure compatibility.
-    sed -e 's|\.\./images|images|g' \
+    sed -e 's|\.\./\.\./website/public/images|images|g' \
         -e 's|🧙‍♂️|🐢|g' \
         "$file" > "$TARGET_DIR/$filename"
   fi

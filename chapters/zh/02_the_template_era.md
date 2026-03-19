@@ -1,6 +1,6 @@
 # 第二章：模板时代 —— UI 即字符串 (The Template Era)
 
-![figure 2.1](../images/ch02_template.png)
+![figure 2.1](../../website/public/images/ch02_template.png)
 
 ## 2.1 描述而非指令
 
