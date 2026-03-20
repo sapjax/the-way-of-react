@@ -78,7 +78,20 @@ export function getUIText(locale: Locale) {
 
 export function pickLocaleFromHeader(header: string | null): Locale {
   if (!header) return DEFAULT_LOCALE;
-  const lower = header.toLowerCase();
-  if (lower.includes("zh")) return "zh";
-  return "en";
+
+  const entries = header.split(",").map((entry) => {
+    const [tag, weightStr] = entry.split(";q=");
+    const name = tag.trim().toLowerCase();
+    const q = weightStr ? parseFloat(weightStr) : 1.0;
+    return { name, q };
+  });
+
+  entries.sort((a, b) => b.q - a.q);
+
+  for (const entry of entries) {
+    if (entry.name.startsWith("zh")) return "zh";
+    if (entry.name.startsWith("en")) return "en";
+  }
+
+  return DEFAULT_LOCALE;
 }
