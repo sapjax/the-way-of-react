@@ -314,8 +314,10 @@ img {
   top: 5rem;
   align-self: start;
   max-height: calc(100vh - 6rem);
-  overflow-x: hidden;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
   padding: 1.5rem;
   margin-top: 1.5rem;
   border: 1.5px solid var(--border);
@@ -336,10 +338,12 @@ img {
   -webkit-mask-image: linear-gradient(to right, black 100%, black 100%);
 }
 
-.sidebar::-webkit-scrollbar {
+.sidebar::-webkit-scrollbar,
+.sidebar__nav::-webkit-scrollbar {
   width: 3px;
 }
-.sidebar::-webkit-scrollbar-thumb {
+.sidebar::-webkit-scrollbar-thumb,
+.sidebar__nav::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 4px;
 }
@@ -349,6 +353,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
   margin-bottom: 1.25rem;
   font-family: var(--font-accent), serif;
   font-size: 0.85rem;
@@ -378,6 +383,9 @@ img {
 .sidebar__nav {
   display: grid;
   gap: 0.25rem;
+  overflow-y: auto;
+  flex: 1;
+  overscroll-behavior: contain;
 }
 
 .sidebar__link {
@@ -1314,7 +1322,8 @@ html[data-theme="dark"] .markdown .hljs-tag { color: #93C5FD; }
     top: 0;
     bottom: 0;
     width: min(85vw, 320px);
-    max-height: none;
+    height: 100dvh;
+    max-height: 100dvh;
     margin: 0;
     border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
     transform: translateX(-105%);
