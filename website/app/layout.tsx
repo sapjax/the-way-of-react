@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Crimson_Pro } from "next/font/google";
+import { Space_Grotesk, Crimson_Pro, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -16,6 +16,12 @@ const crimsonPro = Crimson_Pro({
   display: "swap"
 });
 
+const bricolageGrotesque = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap"
+});
+
 export const metadata: Metadata = {
   title: "The Way of React",
   description: "Read The Way of React online in English and Chinese."
@@ -23,7 +29,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${spaceGrotesk.variable} ${crimsonPro.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${spaceGrotesk.variable} ${crimsonPro.variable} ${bricolageGrotesque.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

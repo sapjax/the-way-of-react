@@ -11,3 +11,6 @@ secrets/
 dist/
 build/
 node_modules/
+
+.agents
+skills-lock.json

@@ -3,13 +3,8 @@
    Inspired by query.gg's neo-brutalist aesthetic
    ═══════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=Space+Grotesk:wght@300..700&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&display=swap');
-
 :root {
   /* Typography */
-  --font-display: "Bricolage Grotesque", "Georgia", serif;
-  --font-body: "Space Grotesk", "DM Sans", "Noto Sans SC", sans-serif;
-  --font-accent: "Crimson Pro", "Georgia", serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", monospace;
 
   /* Light Mode — 宣纸与朱墨 */

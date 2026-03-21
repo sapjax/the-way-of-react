@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import sizeOf from "image-size";
 import { Locale } from "@/lib/i18n";
 
 const REPO_ROOT = path.join(process.cwd(), "..");
@@ -38,6 +39,8 @@ export type ChapterMeta = {
   description: string;
   filePath: string;
   heroImage: string | null;
+  heroImageWidth: number | null;
+  heroImageHeight: number | null;
   hasDemo: boolean;
 };
 
@@ -106,9 +109,24 @@ function readChapter(locale: Locale, id: ChapterId): ChapterData {
   const hasDemo = /^\d+$/.test(chapterNumber) && fs.existsSync(getDemoPath(chapterNumber));
 
   const heroImage = extractHeroImage(content);
+  let heroImageWidth: number | null = null;
+  let heroImageHeight: number | null = null;
   let finalContent = content;
 
   if (heroImage) {
+    const resolved = resolveMarkdownAsset(heroImage);
+    try {
+      const localPath = path.join(process.cwd(), "public", resolved);
+      if (fs.existsSync(localPath)) {
+        // @ts-expect-error: image-size string path typing
+        const dimensions = sizeOf(localPath);
+        if (dimensions.width && dimensions.height) {
+          heroImageWidth = dimensions.width;
+          heroImageHeight = dimensions.height;
+        }
+      }
+    } catch (e) {}
+
     // Escape the hero image path for use in a regex
     const escapedHeroImage = heroImage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const heroImageRegex = new RegExp(`^!\\[[^\\]]*\\]\\(${escapedHeroImage}\\)\\s*$`, "m");
@@ -125,6 +143,8 @@ function readChapter(locale: Locale, id: ChapterId): ChapterData {
     description: extractDescription(content),
     filePath,
     heroImage,
+    heroImageWidth,
+    heroImageHeight,
     hasDemo,
     content: finalContent
   };
@@ -143,6 +163,8 @@ export function getAllChapters(locale: Locale): ChapterMeta[] {
       description: chapter.description,
       filePath: chapter.filePath,
       heroImage: chapter.heroImage,
+      heroImageWidth: chapter.heroImageWidth,
+      heroImageHeight: chapter.heroImageHeight,
       hasDemo: chapter.hasDemo
     };
   });

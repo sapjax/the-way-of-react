@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { LOCALES, LOCALE_COOKIE, pickLocaleFromHeader, isLocale } from "./lib/i18n";
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Preserve paths that should not be localized

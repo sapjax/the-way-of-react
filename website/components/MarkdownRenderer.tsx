@@ -3,6 +3,9 @@ import hljs from "highlight.js/lib/core";
 import javascript from "highlight.js/lib/languages/javascript";
 import xml from "highlight.js/lib/languages/xml";
 import css from "highlight.js/lib/languages/css";
+import fs from "node:fs";
+import path from "node:path";
+import sizeOf from "image-size";
 import { isTrySection } from "@/lib/markdown";
 import { resolveMarkdownAsset } from "@/lib/chapters";
 import { CopyCodeHandler } from "./CopyCodeHandler";
@@ -79,17 +82,34 @@ function renderMarkdown(content: string, demoHref?: string | null, demoLabel?: s
   renderer.image = ({ href, text, title }) => {
     const resolvedHref = resolveMarkdownAsset(href);
     const isFigure = text.toLowerCase().includes("figure");
+    const optimizedSrc = `/_next/image?url=${encodeURIComponent(resolvedHref)}&w=1080&q=75`;
+
+    let widthAttr = "";
+    let heightAttr = "";
+    try {
+      const localPath = path.join(process.cwd(), "public", resolvedHref);
+      if (fs.existsSync(localPath)) {
+        // @ts-expect-error: image-size string path typing
+        const dimensions = sizeOf(localPath);
+        if (dimensions.width && dimensions.height) {
+          widthAttr = ` width="${dimensions.width}"`;
+          heightAttr = ` height="${dimensions.height}"`;
+        }
+      }
+    } catch (e) {}
+
+    const imgTag = `<img src="${optimizedSrc}" alt="${text}" title="${title || ""}" loading="lazy"${widthAttr}${heightAttr} style="width: 100%; height: auto;"${isFigure ? ' class="markdown-image"' : ''} />`;
 
     if (isFigure) {
       return `
         <figure class="markdown-figure">
-          <img src="${resolvedHref}" alt="${text}" title="${title || ""}" class="markdown-image" loading="lazy" />
+          ${imgTag}
           <figcaption class="markdown-figure__caption">${text}</figcaption>
         </figure>
       `;
     }
     
-    return `<img src="${resolvedHref}" alt="${text}" title="${title || ""}" loading="lazy" />`;
+    return imgTag;
   };
 
   renderer.link = ({ href, title, tokens }) => {

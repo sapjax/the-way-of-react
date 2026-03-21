@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { getAllChapters } from "@/lib/chapters";
@@ -106,7 +107,7 @@ export default async function LocaleHomePage({ params }: Props) {
       <article className="home-page">
         <section className="home-hero">
           <div className="home-hero__cover">
-            <img src="/images/cover.png" alt="The Way of React cover" />
+            <Image src="/images/cover.png" alt="The Way of React cover" width={299} height={426} style={{ width: "100%", height: "auto" }} priority />
           </div>
           <div className="home-hero__content">
             <p className="eyebrow">{copy.heroKicker}</p>
