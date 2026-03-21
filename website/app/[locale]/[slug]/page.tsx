@@ -56,7 +56,7 @@ export default async function ChapterPage({ params }: Props) {
   const toc = extractToc(chapter.content);
   const { previous, next } = getChapterNeighbors(locale, slug);
   const heroImage = chapter.heroImage ? resolveMarkdownAsset(chapter.heroImage) : null;
-  const demoHref = chapter.hasDemo ? `/code/ch${chapter.chapterNumber}` : null;
+  const demoHref = chapter.hasDemo ? `/api/demo/ch${chapter.chapterNumber}` : null;
 
   return (
     <AppShell

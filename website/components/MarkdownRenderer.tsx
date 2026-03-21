@@ -45,7 +45,7 @@ function renderMarkdown(content: string, demoHref?: string | null, demoLabel?: s
     const headingHtml = `<h${depth} id="${id}">${htmlText}</h${depth}>`;
 
     if ((depth === 2 || depth === 3) && demoHref && demoLabel && isTrySection(plainText)) {
-      return `<div class="try-section-heading">${headingHtml}<a class="demo-button" href="${demoHref}">${demoLabel}</a></div>`;
+      return `<div class="try-section-heading">${headingHtml}<a class="demo-button" href="${demoHref}" target="_blank" rel="noreferrer">${demoLabel}</a></div>`;
     }
 
     return headingHtml;

@@ -914,6 +914,7 @@ blockquote footer {
   border: 1.5px solid var(--border);
   box-shadow: var(--shadow-hard-sm);
   color: var(--heading);
+  min-width: 0;
 }
 
 .dialogue__bubble p {
@@ -1058,6 +1059,7 @@ blockquote footer {
   color: var(--heading);
   font-size: 0.85em;
   border: 1px solid var(--border-soft);
+  word-break: break-word;
 }
 
 .markdown pre code {
