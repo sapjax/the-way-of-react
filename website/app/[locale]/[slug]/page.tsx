@@ -6,7 +6,7 @@ import { ChapterNav } from "@/components/ChapterNav";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { getAllChapters, getChapterBySlug, getChapterNeighbors, resolveMarkdownAsset } from "@/lib/chapters";
 import { extractToc } from "@/lib/markdown";
-import { Locale, getUIText, isLocale } from "@/lib/i18n";
+import { LOCALES, getUIText, isLocale } from "@/lib/i18n";
 import { getChapterHref } from "@/lib/routes";
 
 const GITHUB_URL = "https://github.com/sapjax/the-way-of-react";
@@ -16,8 +16,8 @@ type Props = {
 };
 
 export async function generateStaticParams() {
-  return ["en", "zh"].flatMap((locale) =>
-    getAllChapters(locale as Locale).map((chapter) => ({
+  return LOCALES.flatMap((locale) =>
+    getAllChapters(locale).map((chapter) => ({
       locale,
       slug: chapter.slug
     }))

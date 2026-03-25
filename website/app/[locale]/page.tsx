@@ -27,10 +27,32 @@ function getHomeCopy(locale: Locale) {
       phaseTwoNote: "第 9-15 章，再重写引擎解决卡顿。",
       chaptersLabel: "章节",
       demosLabel: "Demo",
-      bilingualLabel: "双语",
-      statValueBilingual: "中英",
+      bilingualLabel: "语言",
+      statValueBilingual: "中 / 英 / 日",
       appendixLabel: "附录",
       openerLabel: "开篇引子"
+    };
+  }
+  if (locale === "jp") {
+    return {
+      heroKicker: "DOM から Fiber へ",
+      heroNote: "対話でたどる、React の再発明",
+      summary:
+        "React をゼロから作り直しながら、なぜ React が今の設計になったのかを、ソクラテス式の対話で一歩ずつ理解していきます。",
+      audience:
+        "JavaScript / HTML / DOM の基礎はあるけれど、React の内部設計を本質から理解したい読者向けです。React 初学者にも、日々 React を使う人にも役立ちます。",
+      credits: "本書は著者と AI の協働で執筆しています。誤りはすべて私に、功績はすべて AI にあります。",
+      journeyLabel: "学習ルート",
+      phaseOne: "Phase 1 · Stack Reconciler",
+      phaseOneNote: "第1章-第8章: まず旧方式を限界まで進める。",
+      phaseTwo: "Phase 2 · Fiber Architecture",
+      phaseTwoNote: "第9章-第15章: エンジンを作り直して停止を解消する。",
+      chaptersLabel: "章",
+      demosLabel: "デモ",
+      bilingualLabel: "言語",
+      statValueBilingual: "EN / 中文 / 日本語",
+      appendixLabel: "付録",
+      openerLabel: "導入"
     };
   }
 
@@ -50,7 +72,7 @@ function getHomeCopy(locale: Locale) {
     chaptersLabel: "Chapters",
     demosLabel: "Demos",
     bilingualLabel: "Language",
-    statValueBilingual: "EN / 中文",
+    statValueBilingual: "EN / 中文 / 日本語",
     appendixLabel: "Appendix",
     openerLabel: "Opening Arc"
   };
@@ -71,8 +93,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 function localeDescription(locale: Locale) {
   return locale === "zh"
-    ? "《The Way of React》在线阅读，支持中英双语切换与章节 Demo。"
-    : "Read The Way of React online with bilingual chapters and runnable demos.";
+    ? "《The Way of React》在线阅读，支持中英日三语切换与章节 Demo。"
+    : locale === "jp"
+      ? "The Way of React をオンラインで読む。日本語・英語・中国語の切り替えと各章デモに対応。"
+    : "Read The Way of React online with EN / 中文 / 日本語 chapters and runnable demos.";
 }
 
 export default async function LocaleHomePage({ params }: Props) {

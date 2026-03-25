@@ -1,4 +1,4 @@
-export const LOCALES = ["en", "zh"] as const;
+export const LOCALES = ["en", "zh", "jp"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -61,6 +61,34 @@ export const UI_TEXT = {
     subtitle: "从零重造 React",
     noteNoDemo: "本章没有独立 Demo。",
     switchLanguage: "切换语言"
+  },
+  jp: {
+    home: "ホーム",
+    chapters: "章一覧",
+    toc: "このページ",
+    github: "GitHub",
+    language: "言語",
+    buy: "Leanpub で購入",
+    credits: "謝辞",
+    intro: "本書について",
+    audience: "対象読者",
+    readStart: "読み始める",
+    readBook: "読む",
+    previous: "前の章",
+    next: "次の章",
+    backToChapter: "章に戻る",
+    liveDemo: "デモを開く",
+    demoTitle: "インタラクティブデモ",
+    demoDescription: "このページは各章の元の HTML デモを実行します。",
+    tableOfContents: "目次",
+    feynman: "自分で作れないものは、理解したとは言えない。",
+    toggleTheme: "テーマを切り替え",
+    openMenu: "メニューを開く",
+    closeMenu: "メニューを閉じる",
+    bookTitle: "The Way of React",
+    subtitle: "React をゼロから再発明する",
+    noteNoDemo: "この章には単独デモがありません。",
+    switchLanguage: "言語を切り替え"
   }
 } as const;
 
@@ -68,8 +96,10 @@ export function isLocale(value: string): value is Locale {
   return LOCALES.includes(value as Locale);
 }
 
-export function getOppositeLocale(locale: Locale): Locale {
-  return locale === "en" ? "zh" : "en";
+export function getNextLocale(locale: Locale): Locale {
+  const index = LOCALES.indexOf(locale);
+  const nextIndex = (index + 1) % LOCALES.length;
+  return LOCALES[nextIndex];
 }
 
 export function getUIText(locale: Locale) {
@@ -90,6 +120,7 @@ export function pickLocaleFromHeader(header: string | null): Locale {
 
   for (const entry of entries) {
     if (entry.name.startsWith("zh")) return "zh";
+    if (entry.name.startsWith("ja") || entry.name.startsWith("jp")) return "jp";
     if (entry.name.startsWith("en")) return "en";
   }
 

@@ -3,7 +3,7 @@
 
   # 《The Way of React》—— Reinventing React from Scratch
 
-  **🇺🇸 English** | [🇨🇳 **中文**](README.zh.md)
+  **🇺🇸 English** | [🇨🇳 **中文**](README.zh.md) | [🇯🇵 **日本語**](README.jp.md)
 </div>
 
 ---

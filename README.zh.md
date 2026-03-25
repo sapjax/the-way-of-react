@@ -3,7 +3,7 @@
 
   # 《The Way of React》——从零开始亲手实现 React 
   
-  [**🇺🇸 English**](README.md) | 🇨🇳 **中文**
+  [**🇺🇸 English**](README.md) | 🇨🇳 **中文** | [🇯🇵 **日本語**](README.jp.md)
 
 </div>
 
