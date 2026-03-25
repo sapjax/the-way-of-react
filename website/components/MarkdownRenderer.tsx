@@ -31,6 +31,15 @@ function slugify(text: string) {
     .replace(/\s+/g, "-");
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function renderMarkdown(content: string, demoHref?: string | null, demoLabel?: string) {
   const renderer = new marked.Renderer();
   const options = {
@@ -127,7 +136,7 @@ function renderMarkdown(content: string, demoHref?: string | null, demoLabel?: s
     const language = (lang || "").toLowerCase();
     const validLanguage = language && hljs.getLanguage(language) ? language : "plaintext";
     const highlighted =
-      validLanguage === "plaintext" ? text : hljs.highlight(text, { language: validLanguage }).value;
+      validLanguage === "plaintext" ? escapeHtml(text) : hljs.highlight(text, { language: validLanguage }).value;
 
     return `<div class="code-block-wrapper" data-lang="${validLanguage}"><button type="button" class="copy-button" aria-label="Copy code">Copy</button><pre><code class="hljs language-${validLanguage}">${highlighted}</code></pre></div>`;
   };

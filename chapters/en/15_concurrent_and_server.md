@@ -431,6 +431,7 @@ async function BlogPost({ id }) {
     { $$typeof: 'client-reference', module: './LikeButton.js', props: { postId: id } }
   );
 }
+```
 
 ### Simulating the RSC Flow
 
