@@ -57,10 +57,6 @@
 - [第十五章：从并发到服务器 (Concurrent & Server Components)](chapters/zh/15_concurrent_and_server.md)
 - [附录 A：Mini-React vs React —— 我们简化了什么](chapters/zh/appendix_a_mini_react.md)
 
-## 购买本书 👉 
-
-如果你想支持我，也可以在 [LeanPub](https://leanpub.com/the-way-of-react) 上购买本书。
-
 ## Credits
 
 本书是和 Claude Code & Google Gemini 协作完成的。

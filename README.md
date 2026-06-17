@@ -57,10 +57,6 @@ Or you may have used React heavily at work but know little about how it works in
 - [Chapter 15: From Concurrent to Server](chapters/en/15_concurrent_and_server.md)
 - [Appendix A: Mini-React vs React — What We Simplified](chapters/en/appendix_a_mini_react.md)
 
-## Buy This book 👉 
-
-If you want to support me, You can also buy this book at [LeanPub](https://leanpub.com/the-way-of-react)
-
 ## Credits
 
 This book is vibe written with Claude Code & Google Gemini.
